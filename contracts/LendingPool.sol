@@ -46,20 +46,30 @@ contract LendingPool is Ownable, ERC721 {
         _;
     }
 
-    function borrow(
+    function _borrow(
         uint nftId,
+        uint256 price) internal {
+        require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
+        loans.push(Loan(nftId, block.timestamp, sumInterestPerEth, price));
+        nftContract.transferFrom(msg.sender, address(this), nftId);
+        _mint(msg.sender, loans.length-1);
+    }
+
+    function borrow(
+        uint[] calldata nftId,
         uint256 price,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s) external updateInterest(0) {
         require(!newBorrowsAllowed, "paused");
-        require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
         checkOracle(price, deadline, v, r, s);
-        loans.push(Loan(nftId, block.timestamp, sumInterestPerEth, price));
-        totalBorrowed += price;
-        nftContract.transferFrom(msg.sender, address(this), nftId);
-        _mint(msg.sender, loans.length-1);
+        uint length = nftId.length;
+        totalBorrowed += price * length;
+        for(uint i=0; i<length; i++){
+            _borrow(nftId[i], price);
+        }
+        payable(msg.sender).sendValue(price * length);
     }
 
     function repay(uint loanId) external payable updateInterest(msg.value) {
