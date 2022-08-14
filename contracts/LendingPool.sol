@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: DN
+//SPDX-License-Identifier: None
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -17,7 +17,7 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     IERC721 public constant nftContract =
-        IERC721(0xCa7cA7BcC765F77339bE2d648BA53ce9c8a262bD);
+        IERC721(0xf5de760f2e916647fd766B4AD9E85ff943cE3A2b);
     uint256 public constant maxLoanLength = 2 weeks;
     uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
     bool public newBorrowsAllowed = true;
@@ -26,10 +26,12 @@ contract LendingPool is Ownable, ERC721 {
     uint public lastUpdate;
     uint public totalBorrowed = 0;
     Loan[] public loans;
+    string private baseURI;
 
     constructor(address _oracle) ERC721("TubbyLoan", "TL") {
         oracle = _oracle;
         lastUpdate = block.timestamp;
+        baseURI = string(abi.encodePacked("https://api.tubbysea.com/nft/", nftContract, "/"));
     }
 
     // amountInThisTx -> msg.value if payable method, 0 otherwise
@@ -62,7 +64,7 @@ contract LendingPool is Ownable, ERC721 {
         uint8 v,
         bytes32 r,
         bytes32 s) external updateInterest(0) {
-        require(!newBorrowsAllowed, "paused");
+        require(newBorrowsAllowed, "paused");
         checkOracle(price, deadline, v, r, s);
         uint length = nftId.length;
         totalBorrowed += price * length;
@@ -113,6 +115,7 @@ contract LendingPool is Ownable, ERC721 {
         bytes32 r,
         bytes32 s
     ) public view {
+        require(block.timestamp < deadline, "deadline over");
         require(
             ecrecover(
                 keccak256(
@@ -129,8 +132,37 @@ contract LendingPool is Ownable, ERC721 {
             ) == oracle,
             "not oracle"
         );
-        require(block.timestamp < deadline, "deadline over");
     }
+
+    function currentSumInterestPerEth() view public returns (uint) {
+        uint elapsed = block.timestamp - lastUpdate;
+        return sumInterestPerEth + (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
+    }
+
+    function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay){
+        deadline = block.timestamp + maxLoanLength;
+        Loan storage loan = loans[loanId];
+        uint interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
+        totalRepay = interest + loan.borrowed;
+    }
+
+    function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
+        uint borrowed = priceOfNextItem + totalBorrowed;
+        return (365 days * borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
+    }
+
+    function totalSupply() external view returns (uint supply){
+        return loans.length;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
+    }
+
+    function setBaseURI(string memory newBaseURI) external onlyOwner {
+        baseURI = newBaseURI;
+    }
+
 
     fallback() external {
         // money can still be received through self-destruct, which makes it possible to change balance without calling updateInterested, but if
