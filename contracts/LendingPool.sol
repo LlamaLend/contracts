@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract LendingPool is Ownable, ERC721 {
     using Address for address payable;
@@ -20,18 +21,18 @@ contract LendingPool is Ownable, ERC721 {
         IERC721(0xf5de760f2e916647fd766B4AD9E85ff943cE3A2b);
     uint256 public constant maxLoanLength = 2 weeks;
     uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
+    uint256 public maxPrice = 0;
     bool public newBorrowsAllowed = true;
     address public oracle;
     uint public sumInterestPerEth = 0;
     uint public lastUpdate;
     uint public totalBorrowed = 0;
     Loan[] public loans;
-    string private baseURI;
+    string private baseURI = "https://api.tubbysea.com/nft/";
 
     constructor(address _oracle) ERC721("TubbyLoan", "TL") {
         oracle = _oracle;
         lastUpdate = block.timestamp;
-        baseURI = string(abi.encodePacked("https://api.tubbysea.com/nft/", nftContract, "/"));
     }
 
     // amountInThisTx -> msg.value if payable method, 0 otherwise
@@ -132,6 +133,7 @@ contract LendingPool is Ownable, ERC721 {
             ) == oracle,
             "not oracle"
         );
+        require(price < maxPrice, "max price");
     }
 
     function currentSumInterestPerEth() view public returns (uint) {
@@ -156,13 +158,16 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return baseURI;
+        return string(abi.encodePacked(baseURI, Strings.toHexString(uint160(address(nftContract)), 20), "/"));
+    }
+
+    function setMaxPrice(uint newMaxPrice) external onlyOwner {
+        maxPrice = newMaxPrice;
     }
 
     function setBaseURI(string memory newBaseURI) external onlyOwner {
         baseURI = newBaseURI;
     }
-
 
     fallback() external {
         // money can still be received through self-destruct, which makes it possible to change balance without calling updateInterested, but if
