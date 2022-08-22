@@ -7,12 +7,14 @@ contract ListNfts {
     function getOwnedNfts(address owner, IERC721 nftContract, uint start, uint end) external view returns (uint[100] memory nfts, uint length){
         length = 0;
         while(start < end){
-            if(nftContract.ownerOf(start) == owner){
-                nfts[length] = start;
-                unchecked {
-                    length++;
+            try nftContract.ownerOf(start) returns (address nftOwner) { 
+                if(nftOwner == owner){
+                    nfts[length] = start;
+                    unchecked {
+                        length++;
+                    }
                 }
-            }
+            } catch {}
             unchecked {
                 start++;
             }
