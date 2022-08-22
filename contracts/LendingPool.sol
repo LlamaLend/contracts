@@ -21,7 +21,7 @@ contract LendingPool is Ownable, ERC721 {
         IERC721(0xf5de760f2e916647fd766B4AD9E85ff943cE3A2b);
     uint256 public constant maxLoanLength = 2 weeks;
     uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
-    uint256 public maxPrice = 0;
+    uint256 public maxPrice;
     bool public newBorrowsAllowed = true;
     address public oracle;
     uint public sumInterestPerEth = 0;
@@ -30,8 +30,9 @@ contract LendingPool is Ownable, ERC721 {
     Loan[] public loans;
     string private baseURI = "https://api.tubbysea.com/nft/ethereum/";
 
-    constructor(address _oracle) ERC721("TubbyLoan", "TL") {
+    constructor(address _oracle, uint _maxPrice) ERC721("TubbyLoan", "TL") {
         oracle = _oracle;
+        maxPrice = _maxPrice;
         lastUpdate = block.timestamp;
     }
 
