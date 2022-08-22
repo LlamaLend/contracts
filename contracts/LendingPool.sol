@@ -28,7 +28,7 @@ contract LendingPool is Ownable, ERC721 {
     uint public lastUpdate;
     uint public totalBorrowed = 0;
     Loan[] public loans;
-    string private baseURI = "https://api.tubbysea.com/nft/";
+    string private baseURI = "https://api.tubbysea.com/nft/ethereum/";
 
     constructor(address _oracle) ERC721("TubbyLoan", "TL") {
         oracle = _oracle;
