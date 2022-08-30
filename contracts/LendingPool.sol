@@ -22,7 +22,6 @@ contract LendingPool is Ownable, ERC721 {
     uint256 public constant maxLoanLength = 2 weeks;
     uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
     uint256 public maxPrice;
-    bool public newBorrowsAllowed = true;
     address public oracle;
     uint public sumInterestPerEth = 0;
     uint public lastUpdate;
@@ -66,7 +65,6 @@ contract LendingPool is Ownable, ERC721 {
         uint8 v,
         bytes32 r,
         bytes32 s) external updateInterest(0) {
-        require(newBorrowsAllowed, "paused");
         checkOracle(price, deadline, v, r, s);
         uint length = nftId.length;
         totalBorrowed += price * length;
@@ -94,10 +92,6 @@ contract LendingPool is Ownable, ERC721 {
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
-    }
-
-    function setNewBorrowsAllowed(bool newValue) external onlyOwner {
-        newBorrowsAllowed = newValue;
     }
 
     function setOracle(address newValue) external onlyOwner {
