@@ -137,8 +137,8 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay){
-        deadline = block.timestamp + maxLoanLength;
         Loan storage loan = loans[loanId];
+        deadline = loan.startTime + maxLoanLength;
         uint interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
         totalRepay = interest + loan.borrowed;
     }
