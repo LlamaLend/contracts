@@ -6,6 +6,7 @@ import "./libs/ERC721A.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LendingPool is Ownable, ERC721A {
     using Address for address payable;
@@ -27,12 +28,17 @@ contract LendingPool is Ownable, ERC721A {
     uint public totalBorrowed = 0;
     mapping(uint=>Loan) public loans;
     string private baseURI = "https://api.tubbysea.com/nft/ethereum/";
+    uint maxDailyBorrows; // IMPORTANT: an attacker can borrow 1.5 of this limit if they prepare beforehand
+    uint currentDailyBorrows;
+    uint lastUpdateDailyBorrows;
 
-    constructor(address _oracle, uint _maxPrice, address _nftContract) ERC721A("TubbyLoan", "TL") {
+    constructor(address _oracle, uint _maxPrice, address _nftContract, uint _maxDailyBorrows) ERC721A("TubbyLoan", "TL") {
         oracle = _oracle;
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
         lastUpdate = block.timestamp;
+        maxDailyBorrows = _maxDailyBorrows;
+        lastUpdateDailyBorrows = block.timestamp;
     }
 
     // amountInThisTx -> msg.value if payable method, 0 otherwise
@@ -48,6 +54,13 @@ contract LendingPool is Ownable, ERC721A {
         sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance - amountInThisTx + totalBorrowed + 1); // +1 prevents divisions by 0
         lastUpdate = block.timestamp;
         _;
+    }
+
+    function addDailyBorrows(uint toAdd) internal {
+        uint elapsed = block.timestamp - lastUpdateDailyBorrows;
+        currentDailyBorrows = (currentDailyBorrows - Math.min((maxDailyBorrows*elapsed)/(1 days), currentDailyBorrows)) + toAdd;
+        require(currentDailyBorrows < maxDailyBorrows, "max daily borrow");
+        lastUpdateDailyBorrows = block.timestamp;
     }
 
     function _borrow(
@@ -72,24 +85,37 @@ contract LendingPool is Ownable, ERC721A {
         for(uint i=0; i<length; i++){
             _borrow(nftId[i], price, i);
         }
+        uint borrowedNow = price * length;
+        addDailyBorrows(borrowedNow);
         _mint(msg.sender, length);
-        payable(msg.sender).sendValue(price * length);
+        payable(msg.sender).sendValue(borrowedNow);
     }
 
     function _repay(uint loanId) internal returns (uint) {
         require(ownerOf(loanId) == msg.sender, "not owner");
         Loan storage loan = loans[loanId];
-        require((block.timestamp - loan.startTime) < maxLoanLength, "expired");
+        uint sinceLoanStart = block.timestamp - loan.startTime;
+        require(sinceLoanStart < maxLoanLength, "expired");
         uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
+
+        if(sinceLoanStart < (1 days)){
+            uint until24h;
+            unchecked {
+                until24h = (1 days) - sinceLoanStart;
+            }
+            currentDailyBorrows = currentDailyBorrows - Math.min((loan.borrowed*until24h)/(1 days), currentDailyBorrows);
+        }
+
         return interest + loan.borrowed;
     }
 
     function repay(uint[] calldata loanIds) external payable updateInterest(msg.value) {
         uint length = loanIds.length;
         uint totalToRepay = 0;
+        addDailyBorrows(0); // todo: this is path dependent because of the min() but maybe if we remove this it's still ok?
         for(uint i=0; i<length; i++){
             totalToRepay += _repay(loanIds[i]);
         }
@@ -107,6 +133,10 @@ contract LendingPool is Ownable, ERC721A {
 
     function setOracle(address newValue) external onlyOwner {
         oracle = newValue;
+    }
+
+    function setMaxDailyBorrows(uint _maxDailyBorrows) external onlyOwner {
+        maxDailyBorrows = _maxDailyBorrows;
     }
 
     function deposit() external payable onlyOwner updateInterest(msg.value) {}
