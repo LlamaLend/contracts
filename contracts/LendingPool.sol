@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./libs/ERC721A.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract LendingPool is Ownable, ERC721 {
+contract LendingPool is Ownable, ERC721A {
     using Address for address payable;
 
     struct Loan {
@@ -17,8 +17,7 @@ contract LendingPool is Ownable, ERC721 {
         uint borrowed;
     }
 
-    IERC721 public constant nftContract =
-        IERC721(0xCa7cA7BcC765F77339bE2d648BA53ce9c8a262bD);
+    IERC721 public immutable nftContract;
     uint256 public constant maxLoanLength = 2 weeks;
     uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
     uint256 public maxPrice;
@@ -26,12 +25,13 @@ contract LendingPool is Ownable, ERC721 {
     uint public sumInterestPerEth = 0;
     uint public lastUpdate;
     uint public totalBorrowed = 0;
-    Loan[] public loans;
+    mapping(uint=>Loan) public loans;
     string private baseURI = "https://api.tubbysea.com/nft/ethereum/";
 
-    constructor(address _oracle, uint _maxPrice) ERC721("TubbyLoan", "TL") {
+    constructor(address _oracle, uint _maxPrice, address _nftContract) ERC721A("TubbyLoan", "TL") {
         oracle = _oracle;
         maxPrice = _maxPrice;
+        nftContract = IERC721(_nftContract);
         lastUpdate = block.timestamp;
     }
 
@@ -44,6 +44,7 @@ contract LendingPool is Ownable, ERC721 {
         // then that's only 142.52 bits, way lower than the 256 bits required for it to overflow.
         // There's one attack where you could blow up totalBorrowed by cycling borrows,
         // but since this requires a tubby each time it can only be done 20k times, which only increase bits by 14.28 -> still safu
+        // `address(this).balance - amountInThisTx` can never underflow because amountInThisTx is always 0 or msg.value, both of which are always < address(this).balance 
         sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance - amountInThisTx + totalBorrowed + 1); // +1 prevents divisions by 0
         lastUpdate = block.timestamp;
         _;
@@ -51,11 +52,11 @@ contract LendingPool is Ownable, ERC721 {
 
     function _borrow(
         uint nftId,
-        uint256 price) internal {
+        uint256 price,
+        uint index) internal {
         require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
-        loans.push(Loan(nftId, block.timestamp, sumInterestPerEth, price));
+        loans[_nextTokenId() + index] = Loan(nftId, block.timestamp, sumInterestPerEth, price);
         nftContract.transferFrom(msg.sender, address(this), nftId);
-        _mint(msg.sender, loans.length-1);
     }
 
     function borrow(
@@ -69,20 +70,30 @@ contract LendingPool is Ownable, ERC721 {
         uint length = nftId.length;
         totalBorrowed += price * length;
         for(uint i=0; i<length; i++){
-            _borrow(nftId[i], price);
+            _borrow(nftId[i], price, i);
         }
+        _mint(msg.sender, length);
         payable(msg.sender).sendValue(price * length);
     }
 
-    function repay(uint loanId) external payable updateInterest(msg.value) {
+    function _repay(uint loanId) internal returns (uint) {
         require(ownerOf(loanId) == msg.sender, "not owner");
         Loan storage loan = loans[loanId];
         require((block.timestamp - loan.startTime) < maxLoanLength, "expired");
         uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
-        payable(msg.sender).sendValue(msg.value - (interest + loan.borrowed)); // overflow checks implictly check that amount is enough
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
+        return interest + loan.borrowed;
+    }
+
+    function repay(uint[] calldata loanIds) external payable updateInterest(msg.value) {
+        uint length = loanIds.length;
+        uint totalToRepay = 0;
+        for(uint i=0; i<length; i++){
+            totalToRepay += _repay(loanIds[i]);
+        }
+        payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
     function claw(uint loanId) external onlyOwner updateInterest(0) {
@@ -146,10 +157,6 @@ contract LendingPool is Ownable, ERC721 {
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
         uint borrowed = priceOfNextItem + totalBorrowed;
         return (365 days * borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
-    }
-
-    function totalSupply() external view returns (uint supply){
-        return loans.length;
     }
 
     function _baseURI() internal view override returns (string memory) {

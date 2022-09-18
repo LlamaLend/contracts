@@ -6,6 +6,7 @@ const { sign, getContract } = require('../scripts/utils')
 // clawing works
 
 const userAddress = "0x71a15Ac12ee91BF7c83D08506f3a3588143898B5"
+const nftAddress = "0xf5de760f2e916647fd766B4AD9E85ff943cE3A2b"
 
 const eth1 = "1000000000000000000"
 const eth01 = "100000000000000000"
@@ -13,7 +14,7 @@ const eth01 = "100000000000000000"
 describe("LendingPool", function () {
     it("oracle", async function () {
         const [owner, oracle] = await ethers.getSigners();
-        const { lendingPool } = await getContract("LendingPool", [oracle.address, "100000000000000000"])
+        const { lendingPool } = await getContract("LendingPool", [oracle.address, "100000000000000000", nftAddress])
         const price = 1
         const deadline = Math.round(Date.now() / 1000) + 1000;
         const nftContract = await lendingPool.nftContract()
@@ -24,7 +25,7 @@ describe("LendingPool", function () {
 
     it("basic usage", async function () {
         const [owner, oracle] = await ethers.getSigners();
-        const { lendingPool } = await getContract("LendingPool", [oracle.address, "1000000000000000000"]) // 1eth
+        const { lendingPool } = await getContract("LendingPool", [oracle.address, "1000000000000000000", nftAddress]) // 1eth
         const price = "100000000000000000" // 0.1eth
         const deadline = Math.round(Date.now() / 1000) + 1000;
         const nftContract = await lendingPool.nftContract()
@@ -62,7 +63,7 @@ describe("LendingPool", function () {
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         //await network.provider.send("evm_mine")
         await expect(lendingPool.connect(owner).claw(0)).to.be.revertedWith("not expired");
-        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 60000000)
+        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 80000000)
 
         {
             await expect(lendingPool.connect(owner).repay(1, {value: (eth01*2).toFixed(0)})).to.be.revertedWith("not owner")
@@ -76,7 +77,7 @@ describe("LendingPool", function () {
         }
 
         // can't repay twice
-        await expect(lendingPool.connect(user).repay(1, {value: (eth01*2).toFixed(0)})).to.be.revertedWith("ERC721: owner query for nonexistent token");
+        await expect(lendingPool.connect(user).repay(1, {value: (eth01*2).toFixed(0)})).to.be.revertedWith("OwnerQueryForNonexistentToken()");
 
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         await network.provider.send("evm_mine")
