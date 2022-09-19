@@ -199,7 +199,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, Strings.toHexString(uint160(address(nftContract)), 20), "/"));
+        return string(abi.encodePacked(baseURI, Strings.toHexString(uint160(address(this)), 20), "/", Strings.toHexString(uint160(address(nftContract)), 20), "/"));
     }
 
     function setMaxPrice(uint newMaxPrice) external onlyOwner {
