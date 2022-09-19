@@ -122,6 +122,31 @@ contract LendingPool is Ownable, ERC721A {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
+    function repayOverTimeLimit(
+        uint loanId,
+        uint256 price,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s) external payable updateInterest(msg.value)
+    {
+        checkOracle(price, deadline, v, r, s);
+
+        // copied from _repay()
+        require(ownerOf(loanId) == msg.sender, "not owner");
+        Loan storage loan = loans[loanId];
+        uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
+        _burn(loanId);
+        totalBorrowed -= loan.borrowed;
+        nftContract.transferFrom(address(this), msg.sender, loan.nft);
+
+        uint loanEnd = loan.startTime + maxLoanLength;
+        require(block.timestamp > loanEnd, "not expired");
+        uint extra = ((block.timestamp - loanEnd)*price)/(1 days);
+
+        payable(msg.sender).sendValue(msg.value - (interest + loan.borrowed + extra));
+    }
+
     function claw(uint loanId) external onlyOwner updateInterest(0) {
         Loan storage loan = loans[loanId];
         require(_exists(loanId), "loan closed");
@@ -182,6 +207,17 @@ contract LendingPool is Ownable, ERC721A {
         deadline = loan.startTime + maxLoanLength;
         uint interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
         totalRepay = interest + loan.borrowed;
+    }
+
+    function repayPriceOverTimeLimit(uint price, uint loanId, uint period) external view returns (uint total, uint interest, uint increasePerPeriod){
+        Loan storage loan = loans[loanId];
+        interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
+
+        uint loanEnd = loan.startTime + maxLoanLength;
+        uint extra = ((block.timestamp - loanEnd)*price)/(1 days);
+
+        total = interest + loan.borrowed + extra;
+        increasePerPeriod = (period*price)/(1 days);
     }
 
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
