@@ -95,8 +95,11 @@ contract LendingPool is Ownable, ERC721A {
         require(ownerOf(loanId) == msg.sender, "not owner");
         Loan storage loan = loans[loanId];
         uint sinceLoanStart = block.timestamp - loan.startTime;
-        require(sinceLoanStart < maxLoanLength, "expired");
         uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
+        if(sinceLoanStart > maxLoanLength){
+            uint loanEnd = loan.startTime + maxLoanLength;
+            interest += ((block.timestamp - loanEnd)*loan.borrowed)/(1 days);
+        }
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
@@ -120,31 +123,6 @@ contract LendingPool is Ownable, ERC721A {
             totalToRepay += _repay(loanIds[i]);
         }
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
-    }
-
-    function repayOverTimeLimit(
-        uint loanId,
-        uint256 price,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s) external payable updateInterest(msg.value)
-    {
-        checkOracle(price, deadline, v, r, s);
-
-        // copied from _repay()
-        require(ownerOf(loanId) == msg.sender, "not owner");
-        Loan storage loan = loans[loanId];
-        uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
-        _burn(loanId);
-        totalBorrowed -= loan.borrowed;
-        nftContract.transferFrom(address(this), msg.sender, loan.nft);
-
-        uint loanEnd = loan.startTime + maxLoanLength;
-        require(block.timestamp > loanEnd, "not expired");
-        uint extra = ((block.timestamp - loanEnd)*price)/(1 days);
-
-        payable(msg.sender).sendValue(msg.value - (interest + loan.borrowed + extra));
     }
 
     function claw(uint loanId) external onlyOwner updateInterest(0) {
@@ -202,22 +180,17 @@ contract LendingPool is Ownable, ERC721A {
         return sumInterestPerEth + (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
     }
 
-    function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay){
+    function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay, uint principal, uint interest, uint lateFees){
         Loan storage loan = loans[loanId];
         deadline = loan.startTime + maxLoanLength;
-        uint interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
-        totalRepay = interest + loan.borrowed;
-    }
-
-    function repayPriceOverTimeLimit(uint price, uint loanId, uint period) external view returns (uint total, uint interest, uint increasePerPeriod){
-        Loan storage loan = loans[loanId];
-        interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
-
-        uint loanEnd = loan.startTime + maxLoanLength;
-        uint extra = ((block.timestamp - loanEnd)*price)/(1 days);
-
-        total = interest + loan.borrowed + extra;
-        increasePerPeriod = (period*price)/(1 days);
+        interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
+        if(block.timestamp > deadline){
+            lateFees = ((block.timestamp - deadline)*loan.borrowed)/(1 days);
+        } else {
+            lateFees = 0;
+        }
+        principal = loan.borrowed;
+        totalRepay = principal + interest + lateFees;
     }
 
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
