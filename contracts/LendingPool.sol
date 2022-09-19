@@ -31,6 +31,7 @@ contract LendingPool is Ownable, ERC721A {
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow 1.5 of this limit if they prepare beforehand
     uint currentDailyBorrows;
     uint lastUpdateDailyBorrows;
+    address[] public liquidators;
 
     constructor(address _oracle, uint _maxPrice, address _nftContract, uint _maxDailyBorrows) ERC721A("TubbyLoan", "TL") {
         oracle = _oracle;
@@ -125,7 +126,8 @@ contract LendingPool is Ownable, ERC721A {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(uint loanId) external onlyOwner updateInterest(0) {
+    function claw(uint loanId, uint liquidatorIndex) external updateInterest(0) {
+        require(liquidators[liquidatorIndex] == msg.sender);
         Loan storage loan = loans[loanId];
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
@@ -204,6 +206,18 @@ contract LendingPool is Ownable, ERC721A {
 
     function setMaxPrice(uint newMaxPrice) external onlyOwner {
         maxPrice = newMaxPrice;
+    }
+
+    function addLiquidator(address liq) external onlyOwner {
+        liquidators.push(liq);
+    }
+
+    function removeLiquidator(uint index) external onlyOwner {
+        liquidators[index] = address(0);
+    }
+
+    function liquidatorsLength() external view returns (uint){
+        return liquidators.length;
     }
 
     function setBaseURI(string memory newBaseURI) external onlyOwner {
