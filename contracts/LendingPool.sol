@@ -27,7 +27,7 @@ contract LendingPool is Ownable, ERC721A {
     uint public lastUpdate;
     uint public totalBorrowed = 0;
     mapping(uint=>Loan) public loans;
-    string private baseURI = "https://api.tubbysea.com/nft/ethereum/";
+    string private baseURI = "https://api.tubbysea.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow 1.5 of this limit if they prepare beforehand
     uint currentDailyBorrows;
     uint lastUpdateDailyBorrows;
@@ -165,6 +165,7 @@ contract LendingPool is Ownable, ERC721A {
                         "\x19Ethereum Signed Message:\n84",
                         price,
                         deadline,
+                        block.chainid,
                         address(nftContract)
                     )
                 ),
@@ -201,7 +202,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, Strings.toHexString(uint160(address(this)), 20), "/", Strings.toHexString(uint160(address(nftContract)), 20), "/"));
+        return string(abi.encodePacked(baseURI, Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/", Strings.toHexString(uint160(address(nftContract)), 20), "/"));
     }
 
     function setMaxPrice(uint newMaxPrice) external onlyOwner {
