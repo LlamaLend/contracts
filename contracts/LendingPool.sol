@@ -28,10 +28,13 @@ contract LendingPool is Ownable, ERC721A {
     uint public totalBorrowed = 0;
     mapping(uint=>Loan) public loans;
     string private baseURI = "https://api.tubbysea.com/nft/";
-    uint maxDailyBorrows; // IMPORTANT: an attacker can borrow 1.5 of this limit if they prepare beforehand
+    uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint currentDailyBorrows;
     uint lastUpdateDailyBorrows;
     address[] public liquidators;
+
+    event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
+    event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
 
     constructor(address _oracle, uint _maxPrice, address _nftContract, uint _maxDailyBorrows) ERC721A("TubbyLoan", "TL") {
         oracle = _oracle;
@@ -62,6 +65,7 @@ contract LendingPool is Ownable, ERC721A {
         currentDailyBorrows = (currentDailyBorrows - Math.min((maxDailyBorrows*elapsed)/(1 days), currentDailyBorrows)) + toAdd;
         require(currentDailyBorrows < maxDailyBorrows, "max daily borrow");
         lastUpdateDailyBorrows = block.timestamp;
+        emit Borrowed(currentDailyBorrows, toAdd);
     }
 
     function _borrow(
@@ -110,7 +114,9 @@ contract LendingPool is Ownable, ERC721A {
             unchecked {
                 until24h = (1 days) - sinceLoanStart;
             }
-            currentDailyBorrows = currentDailyBorrows - Math.min((loan.borrowed*until24h)/(1 days), currentDailyBorrows);
+            uint toReduce = Math.min((loan.borrowed*until24h)/(1 days), currentDailyBorrows);
+            currentDailyBorrows = currentDailyBorrows - toReduce;
+            emit ReducedDailyBorrows(currentDailyBorrows, toReduce);
         }
 
         return interest + loan.borrowed;
@@ -162,7 +168,7 @@ contract LendingPool is Ownable, ERC721A {
             ecrecover(
                 keccak256(
                     abi.encodePacked(
-                        "\x19Ethereum Signed Message:\n84",
+                        "\x19Ethereum Signed Message:\n116",
                         price,
                         deadline,
                         block.chainid,
