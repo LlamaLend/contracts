@@ -22,7 +22,7 @@ describe("LendingPool", function () {
     })
 
     it("basic usage", async function () {
-        const [owner, oracle] = await ethers.getSigners();
+        const [owner, oracle, liquidator] = await ethers.getSigners();
         const { lendingPool } = await getContract("LendingPool", [oracle.address, eth1, nftAddress, startMaxDailyBorrows]) // 1eth
         const price = eth01 // 0.1eth
         const deadline = Math.round(Date.now() / 1000) + 1000;
@@ -41,6 +41,7 @@ describe("LendingPool", function () {
         await expect(lendingPool.connect(oracle).deposit({ value: eth1 })).to.be.revertedWith("Ownable: caller is not the owner");
 
         const signature = await sign(oracle, price, deadline, nftContract)
+        await lendingPool.connect(owner).addLiquidator(liquidator.address)
 
         await nft.connect(user).setApprovalForAll(lendingPool.address, true)
         // only owner can borrow nfts
@@ -54,14 +55,14 @@ describe("LendingPool", function () {
             expect(await nft.ownerOf(683971)).to.equal(lendingPool.address)
             expect(postEth.sub(prevEth)).to.be.equal(ethers.BigNumber.from(price).mul(2).sub(tx.gasUsed*tx.effectiveGasPrice))
         }
-        expect(await lendingPool.tokenURI(1)).to.eq("https://api.tubbysea.com/nft/ethereum/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1")
+        expect(await lendingPool.tokenURI(1)).to.eq("https://api.tubbysea.com/nft/31337/0x92a100e3df76b121ac849a973afea63dc3e96682/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1")
 
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.be.approximately(0.16e18, 200000)
         expect(Number(await lendingPool.currentAnnualInterest(eth01))).to.be.approximately(0.24e18, 200000)
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         //await network.provider.send("evm_mine")
-        await expect(lendingPool.connect(owner).claw(0)).to.be.revertedWith("not expired");
-        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 80000000)
+        await expect(lendingPool.connect(liquidator).claw(0, 0)).to.be.revertedWith("not expired");
+        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 120000000)
 
         {
             await expect(lendingPool.connect(owner).repay([1], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("not owner")
@@ -82,10 +83,10 @@ describe("LendingPool", function () {
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.be.approximately(0.08e18, 175459503840000)
 
         console.log("second loan", (await lendingPool.infoToRepayLoan(0)).totalRepay.toString())
-        expect(Number((await lendingPool.infoToRepayLoan(0)).totalRepay)).to.be.approximately(((0.16 * 7 + 0.08 * 7) / 365 * 0.1 + 0.1) * 1e18, 46049252050)
-        await expect(lendingPool.connect(user).repay([0], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("expired");
-        await lendingPool.connect(owner).claw(0);
-        expect(await nft.ownerOf(683971)).to.equal(owner.address)
+        expect(Number((await lendingPool.infoToRepayLoan(0)).totalRepay)).to.be.approximately(((0.16 * 7 + 0.08 * 7) / 365 * 0.1 + 0.1) * 1e18, 4604925205000)
+        await lendingPool.connect(liquidator).claw(0, 0);
+        expect(await nft.ownerOf(683971)).to.equal(liquidator.address)
+        await expect(lendingPool.connect(user).repay([0], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("OwnerQueryForNonexistentToken()");
 
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.eq(0)
         await expect(lendingPool.connect(user).withdraw(await ethers.provider.getBalance(lendingPool.address))).to.be.revertedWith("Ownable: caller is not the owner");
