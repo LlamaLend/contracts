@@ -9,7 +9,7 @@ async function getContract(name, params){
 
 async function sign(signer, price, deadline, nftContract){
     const chainId = await signer.getChainId()
-    const message = ethers.utils.arrayify(new ethers.utils.AbiCoder().encode([ "uint", "uint", "uint"], [ price, deadline, chainId ])+nftContract.substr(2));
+    const message = ethers.utils.arrayify("0x"+new ethers.utils.AbiCoder().encode([ "uint216", "uint", "uint"], [ price, deadline, chainId ]).substr(10+2)+nftContract.substr(2));
     const signature = ethers.utils.splitSignature(await signer.signMessage(message))
     return signature
 }

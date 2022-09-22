@@ -13,9 +13,9 @@ contract LendingPool is Ownable, ERC721A {
 
     struct Loan {
         uint nft;
-        uint startTime;
         uint startInterestSum;
-        uint borrowed;
+        uint40 startTime; // safe until year 231,800
+        uint216 borrowed; // would need to borrow 1e+47 ETH -> that much ETH doesnt even exist
     }
 
     IERC721 public immutable nftContract;
@@ -70,16 +70,16 @@ contract LendingPool is Ownable, ERC721A {
 
     function _borrow(
         uint nftId,
-        uint256 price,
+        uint216 price,
         uint index) internal {
         require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
-        loans[_nextTokenId() + index] = Loan(nftId, block.timestamp, sumInterestPerEth, price);
+        loans[_nextTokenId() + index] = Loan(nftId, sumInterestPerEth, uint40(block.timestamp), price);
         nftContract.transferFrom(msg.sender, address(this), nftId);
     }
 
     function borrow(
         uint[] calldata nftId,
-        uint256 price,
+        uint216 price,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -157,7 +157,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     function checkOracle(
-        uint256 price,
+        uint216 price,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -168,7 +168,7 @@ contract LendingPool is Ownable, ERC721A {
             ecrecover(
                 keccak256(
                     abi.encodePacked(
-                        "\x19Ethereum Signed Message:\n116",
+                        "\x19Ethereum Signed Message:\n111",
                         price,
                         deadline,
                         block.chainid,
