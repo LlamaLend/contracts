@@ -62,7 +62,7 @@ describe("LendingPool", function () {
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         //await network.provider.send("evm_mine")
         await expect(lendingPool.connect(liquidator).claw(0, 0)).to.be.revertedWith("not expired");
-        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 120000000)
+        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 150000000)
 
         {
             await expect(lendingPool.connect(owner).repay([1], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("not owner")
@@ -89,6 +89,10 @@ describe("LendingPool", function () {
         await expect(lendingPool.connect(user).repay([0], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("OwnerQueryForNonexistentToken()");
 
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.eq(0)
+
+        const signature2 = await sign(oracle, price, deadline+1e8, nftContract)
+        await lendingPool.connect(user).borrow([683972, 683973, 683974], price, deadline+1e8, signature2.v, signature2.r, signature2.s)
+
         await expect(lendingPool.connect(user).withdraw(await ethers.provider.getBalance(lendingPool.address))).to.be.revertedWith("Ownable: caller is not the owner");
         await lendingPool.withdraw(await ethers.provider.getBalance(lendingPool.address))
     })
