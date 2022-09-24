@@ -27,7 +27,7 @@ contract LendingPool is Ownable, ERC721A {
     uint public lastUpdate;
     uint public totalBorrowed = 0;
     mapping(uint=>Loan) public loans;
-    string private baseURI = "https://api.tubbysea.com/nft/";
+    string private baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint currentDailyBorrows;
     uint lastUpdateDailyBorrows;
@@ -205,6 +205,12 @@ contract LendingPool is Ownable, ERC721A {
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
         uint borrowed = priceOfNextItem + totalBorrowed;
         return (365 days * borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
+    }
+
+    function getDailyBorrows() external view returns (uint dailyBorrows, uint maxDailyBorrowsLimit) {
+        uint elapsed = block.timestamp - lastUpdateDailyBorrows;
+        dailyBorrows = currentDailyBorrows - Math.min((maxDailyBorrows*elapsed)/(1 days), currentDailyBorrows);
+        maxDailyBorrowsLimit = maxDailyBorrows;
     }
 
     function _baseURI() internal view override returns (string memory) {
