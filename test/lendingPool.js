@@ -163,7 +163,7 @@ describe("LendingPool", function () {
     })
 
     it("correctly handles emergency shutdowns", async function () {
-        expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.eq(0)
+        //expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.eq(0)
 
         const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address)
         await expect(this.factory.connect(this.user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
@@ -180,5 +180,9 @@ describe("LendingPool", function () {
 
     it("allows owners to withdraw", async function() {
         await this.lendingPool.withdraw(await ethers.provider.getBalance(this.lendingPool.address))
+    })
+    
+    it("setBaseURI", async function() {
+        await this.lendingPool.setBaseURI("abc")
     })
 })
