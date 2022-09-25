@@ -41,6 +41,7 @@ contract LendingPool is Ownable, ERC721A {
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
         uint _maxLoanLength, uint _maxInterestPerEthPerSecond, address _owner) ERC721A(_name, _symbol)
     {
+        require(_oracle != address(0), "oracle can't be 0");
         oracle = _oracle;
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
@@ -157,6 +158,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     function setOracle(address newValue) external onlyOwner {
+        require(newValue != address(0), "oracle can't be 0");
         oracle = newValue;
     }
 
