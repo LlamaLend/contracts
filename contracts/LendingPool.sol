@@ -249,7 +249,7 @@ contract LendingPool is Ownable, ERC721A {
         return liquidators.length;
     }
 
-    function setBaseURI(string memory newBaseURI) external onlyOwner {
+    function setBaseURI(string calldata newBaseURI) external onlyOwner {
         baseURI = newBaseURI;
     }
 
