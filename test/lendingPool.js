@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
-const { sign, getContract } = require('../scripts/utils')
+const { sign, getContract, deployAll } = require('../scripts/utils')
 
 const eth1 = "1000000000000000000"
 const eth01 = "100000000000000000"
@@ -12,7 +12,7 @@ const startMaxDailyBorrows = eth1
 describe("LendingPool", function () {
     it("oracle", async function () {
         const [owner, oracle] = await ethers.getSigners();
-        const { lendingPool } = await getContract("LendingPool", [oracle.address, eth01, nftAddress, startMaxDailyBorrows])
+        const { lendingPool } = await deployAll(oracle.address, eth01, nftAddress, startMaxDailyBorrows, "TubbyLoan", "TL", "1209600", "25367833587")
         const price = 1
         const deadline = Math.round(Date.now() / 1000) + 1000;
         const nftContract = await lendingPool.nftContract()
@@ -23,7 +23,7 @@ describe("LendingPool", function () {
 
     it("basic usage", async function () {
         const [owner, oracle, liquidator] = await ethers.getSigners();
-        const { lendingPool } = await getContract("LendingPool", [oracle.address, eth1, nftAddress, startMaxDailyBorrows]) // 1eth
+        const { lendingPool, factory } = await deployAll(oracle.address, eth1, nftAddress, startMaxDailyBorrows, "TubbyLoan", "TL", "1209600", "25367833587")
         const price = eth01 // 0.1eth
         const deadline = Math.round(Date.now() / 1000) + 1000;
         const nftContract = await lendingPool.nftContract()
@@ -55,7 +55,7 @@ describe("LendingPool", function () {
             expect(await nft.ownerOf(683971)).to.equal(lendingPool.address)
             expect(postEth.sub(prevEth)).to.be.equal(ethers.BigNumber.from(price).mul(2).sub(tx.gasUsed*tx.effectiveGasPrice))
         }
-        expect(await lendingPool.tokenURI(1)).to.eq("https://api.tubbysea.com/nft/31337/0x92a100e3df76b121ac849a973afea63dc3e96682/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1")
+        expect(await lendingPool.tokenURI(1)).to.eq(`https://nft.llamalend.com/nft/31337/${lendingPool.address.toLowerCase()}/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1`)
 
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.be.approximately(0.16e18, 200000)
         expect(Number(await lendingPool.currentAnnualInterest(eth01))).to.be.approximately(0.24e18, 200000)
@@ -91,7 +91,11 @@ describe("LendingPool", function () {
         expect(Number(await lendingPool.currentAnnualInterest(0))).to.eq(0)
 
         const signature2 = await sign(oracle, price, deadline+1e8, nftContract)
+        await expect(factory.connect(user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
         await lendingPool.connect(user).borrow([683972, 683973, 683974], price, deadline+1e8, signature2.v, signature2.r, signature2.s)
+        await factory.connect(owner).emergencyShutdown([0])
+        await expect(lendingPool.connect(user).borrow([683975], price, deadline+1e8, signature2.v, signature2.r, signature2.s))
+            .to.be.revertedWith("max price");
 
         await expect(lendingPool.connect(user).withdraw(await ethers.provider.getBalance(lendingPool.address))).to.be.revertedWith("Ownable: caller is not the owner");
         await lendingPool.withdraw(await ethers.provider.getBalance(lendingPool.address))
