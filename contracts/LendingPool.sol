@@ -19,8 +19,9 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     IERC721 public immutable nftContract;
-    uint256 public constant maxLoanLength = 2 weeks;
-    uint256 public constant maxInterestPerEthPerSecond = 25367833587; // ~ 0.8 ether / 1 years;
+    uint256 public immutable maxLoanLength;
+    uint256 public immutable maxInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
+    address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
     uint public sumInterestPerEth = 0;
@@ -36,13 +37,20 @@ contract LendingPool is Ownable, ERC721A {
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
     event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
 
-    constructor(address _oracle, uint _maxPrice, address _nftContract, uint _maxDailyBorrows) ERC721A("TubbyLoan", "TL") {
+    constructor(address _oracle, uint _maxPrice, address _nftContract,
+        uint _maxDailyBorrows, string memory _name, string memory _symbol,
+        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, address _owner) ERC721A(_name, _symbol)
+    {
         oracle = _oracle;
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
         lastUpdate = block.timestamp;
         maxDailyBorrows = _maxDailyBorrows;
         lastUpdateDailyBorrows = block.timestamp;
+        maxLoanLength = _maxLoanLength;
+        maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
+        transferOwnership(_owner);
+        factory = msg.sender;
     }
 
     // amountInThisTx -> msg.value if payable method, 0 otherwise
@@ -235,6 +243,11 @@ contract LendingPool is Ownable, ERC721A {
 
     function setBaseURI(string memory newBaseURI) external onlyOwner {
         baseURI = newBaseURI;
+    }
+
+    function emergencyShutdown() external {
+        require(msg.sender == factory);
+        maxPrice = 0; // prevents new borrows
     }
 
     fallback() external {
