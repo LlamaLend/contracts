@@ -53,8 +53,7 @@ contract LendingPool is Ownable, ERC721A {
         factory = msg.sender;
     }
 
-    // amountInThisTx -> msg.value if payable method, 0 otherwise
-    modifier updateInterest(uint amountInThisTx) {
+    modifier updateInterest() {
         uint elapsed = block.timestamp - lastUpdate;
         // this can't overflow
         // if we assume elapsed = 10 years = 10*365*24*3600 = 315360000
@@ -62,8 +61,16 @@ contract LendingPool is Ownable, ERC721A {
         // then that's only 142.52 bits, way lower than the 256 bits required for it to overflow.
         // There's one attack where you could blow up totalBorrowed by cycling borrows,
         // but since this requires a tubby each time it can only be done 20k times, which only increase bits by 14.28 -> still safu
-        // `address(this).balance - amountInThisTx` can never underflow because amountInThisTx is always 0 or msg.value, both of which are always < address(this).balance 
-        sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance - amountInThisTx + totalBorrowed + 1); // +1 prevents divisions by 0
+        // `address(this).balance - msg.value` can never underflow because msg.value is always < address(this).balance
+        sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance - msg.value + totalBorrowed + 1); // +1 prevents divisions by 0
+        lastUpdate = block.timestamp;
+        _;
+    }
+
+    // copy of updateInterest() with msg.value = 0
+    modifier updateInterestNonpayable() {
+        uint elapsed = block.timestamp - lastUpdate;
+        sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
         lastUpdate = block.timestamp;
         _;
     }
@@ -91,7 +98,7 @@ contract LendingPool is Ownable, ERC721A {
         uint256 deadline,
         uint8 v,
         bytes32 r,
-        bytes32 s) external updateInterest(0) {
+        bytes32 s) external updateInterestNonpayable {
         checkOracle(price, deadline, v, r, s);
         uint length = nftId.length;
         totalBorrowed += price * length;
@@ -130,7 +137,7 @@ contract LendingPool is Ownable, ERC721A {
         return interest + loan.borrowed;
     }
 
-    function repay(uint[] calldata loanIds) external payable updateInterest(msg.value) {
+    function repay(uint[] calldata loanIds) external payable updateInterest {
         uint length = loanIds.length;
         uint totalToRepay = 0;
         for(uint i=0; i<length; i++){
@@ -139,7 +146,7 @@ contract LendingPool is Ownable, ERC721A {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(uint loanId, uint liquidatorIndex) external updateInterest(0) {
+    function claw(uint loanId, uint liquidatorIndex) external updateInterestNonpayable {
         require(liquidators[liquidatorIndex] == msg.sender);
         Loan storage loan = loans[loanId];
         require(_exists(loanId), "loan closed");
@@ -157,9 +164,9 @@ contract LendingPool is Ownable, ERC721A {
         maxDailyBorrows = _maxDailyBorrows;
     }
 
-    function deposit() external payable onlyOwner updateInterest(msg.value) {}
+    function deposit() external payable onlyOwner updateInterest {}
 
-    function withdraw(uint amount) external onlyOwner updateInterest(0) {
+    function withdraw(uint amount) external onlyOwner updateInterestNonpayable {
         payable(msg.sender).sendValue(amount);
     }
 
@@ -250,7 +257,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     fallback() external {
-        // money can still be received through self-destruct, which makes it possible to change balance without calling updateInterested, but if
+        // money can still be received through self-destruct, which makes it possible to change balance without calling updateInterest, but if
         // owner does that -> they are lowering the money they earn through interest
         // debtor does that -> they always lose money because all loans are < 2 weeks
         revert();
