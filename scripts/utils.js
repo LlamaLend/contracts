@@ -1,23 +1,35 @@
 const { ethers } = require("hardhat");
 
-async function getContract(name, params = []) {
-  const LendingPool = await hre.ethers.getContractFactory(name);
-  const lendingPool = await LendingPool.deploy(...params);
-  await lendingPool.deployed();
-  return { lendingPool }
-}
-
-async function deployAll(...params) {
-  const Factory = await hre.ethers.getContractFactory("LlamaLendFactory");
+async function deployAll(
+  _oracle,
+  _maxPrice,
+  _nftContract,
+  _maxDailyBorrows,
+  _name,
+  _symbol,
+  _maxLoanLength,
+  _maxInterestPerEthPerSecond,
+) {
+  const Factory = await ethers.getContractFactory("LlamaLendFactory");
   const factory = await Factory.deploy();
   await factory.deployed();
   
-  await factory.createPool(...params)
+  await factory.createPool(
+    _oracle,
+    _maxPrice,
+    _nftContract,
+    _maxDailyBorrows,
+    _name,
+    _symbol,
+    _maxLoanLength,
+    _maxInterestPerEthPerSecond,
+  );
+
   const lendingPoolAddress = await factory.allPools(0);
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.attach(lendingPoolAddress)
 
-  return { factory, lendingPool }
+  return { factory, lendingPool };
 }
 
 async function sign(signer, price, deadline, nftContract) {
@@ -28,7 +40,6 @@ async function sign(signer, price, deadline, nftContract) {
 }
 
 module.exports = {
-  getContract,
   deployAll,
   sign
 }

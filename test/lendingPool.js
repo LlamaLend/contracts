@@ -1,103 +1,184 @@
 const { expect } = require("chai");
 const { ethers, network } = require("hardhat");
-const { sign, getContract, deployAll } = require('../scripts/utils')
+const { sign, deployAll } = require('../scripts/utils');
 
-const eth1 = "1000000000000000000"
-const eth01 = "100000000000000000"
+const ONE_ETH = "1000000000000000000";
+const ONE_TENTH_OF_AN_ETH = "100000000000000000";
 
 const userAddress = "0x71a15Ac12ee91BF7c83D08506f3a3588143898B5"
 const nftAddress = "0xf5de760f2e916647fd766B4AD9E85ff943cE3A2b"
-const startMaxDailyBorrows = eth1
+const startMaxDailyBorrows = ONE_ETH
+const SECONDS_PER_DAY = 24 * 60 * 60
+const DAYS_PER_YEAR = 365;
+const INTEREST_WEI_PER_ETH_PER_YEAR = 0.8e18;
+const DEADLINE = Math.round(Date.now() / 1000) + 1000;
+const PRICE = ONE_TENTH_OF_AN_ETH;
 
 describe("LendingPool", function () {
-    it("oracle", async function () {
-        const [owner, oracle] = await ethers.getSigners();
-        const { lendingPool } = await deployAll(oracle.address, eth01, nftAddress, startMaxDailyBorrows, "TubbyLoan", "TL", "1209600", "25367833587")
-        const price = 1
-        const deadline = Math.round(Date.now() / 1000) + 1000;
-        const nftContract = await lendingPool.nftContract()
-        const signature = await sign(oracle, price, deadline, nftContract)
-        await lendingPool.setMaxPrice(eth1) // 1eth
-        await lendingPool.checkOracle(price, deadline, signature.v, signature.r, signature.s)
-    })
+    let owner;
+    let oracle;
+    let liquidator;
+    let factory;
+    let lendingPool;
+    let nft;
+    let user;
 
-    it("basic usage", async function () {
-        const [owner, oracle, liquidator] = await ethers.getSigners();
-        const { lendingPool, factory } = await deployAll(oracle.address, eth1, nftAddress, startMaxDailyBorrows, "TubbyLoan", "TL", "1209600", "25367833587")
-        const price = eth01 // 0.1eth
-        const deadline = Math.round(Date.now() / 1000) + 1000;
-        const nftContract = await lendingPool.nftContract()
+    this.beforeAll(async function () {
+        const [ _owner, _oracle, _liquidator ] = await ethers.getSigners();
+        this.owner = _owner;
+        this.oracle = _oracle;
+        this.liquidator = _liquidator;
+
+        const { factory, lendingPool } = await deployAll(
+            this.oracle.address, 
+            ONE_TENTH_OF_AN_ETH, 
+            nftAddress, 
+            startMaxDailyBorrows, 
+            "TubbyLoan", 
+            "TL", 
+            14 * SECONDS_PER_DAY, 
+            Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / DAYS_PER_YEAR / SECONDS_PER_DAY)
+        );
+        
+        this.factory = factory;
+        this.lendingPool = lendingPool;
+        this.nft = new ethers.Contract(await this.lendingPool.nftContract(), ["function ownerOf(uint) view returns (address)", "function setApprovalForAll(address operator, bool approved)"], this.owner)
 
         await network.provider.request({
             method: "hardhat_impersonateAccount",
             params: [userAddress],
         });
-        const user = await ethers.provider.getSigner(userAddress); // nfts owned: 683971, 683972
 
-        const nft = new ethers.Contract(nftContract, ["function ownerOf(uint) view returns (address)", "function setApprovalForAll(address operator, bool approved)"], owner)
+        this.user = await ethers.provider.getSigner(userAddress);   
+    });
 
-        expect(await nft.ownerOf(683972)).to.equal(userAddress)
-        await lendingPool.deposit({ value: eth1 })
-        await expect(lendingPool.connect(oracle).deposit({ value: eth1 })).to.be.revertedWith("Ownable: caller is not the owner");
+    it("accepts signatures from a price oracle", async function () {
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        await this.lendingPool.setMaxPrice(ONE_ETH) // 1eth
+        await this.lendingPool.checkOracle(PRICE, DEADLINE, signature.v, signature.r, signature.s)
+    });
 
-        const signature = await sign(oracle, price, deadline, nftContract)
-        await lendingPool.connect(owner).addLiquidator(liquidator.address)
+    it("can not use expired oracle signatures", async function() {
+        // TODO
+    });
 
-        await nft.connect(user).setApprovalForAll(lendingPool.address, true)
-        // only owner can borrow nfts
-        await expect(lendingPool.connect(owner).borrow([683971, 683972], price, deadline, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
-        // cant borrow same nft twice
-        await expect(lendingPool.connect(user).borrow([683971, 683971], price, deadline, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
-        {
-            const prevEth = await ethers.provider.getBalance(userAddress);
-            const tx = await (await lendingPool.connect(user).borrow([683971, 683972], price, deadline, signature.v, signature.r, signature.s)).wait()
-            const postEth = await ethers.provider.getBalance(userAddress);
-            expect(await nft.ownerOf(683971)).to.equal(lendingPool.address)
-            expect(postEth.sub(prevEth)).to.be.equal(ethers.BigNumber.from(price).mul(2).sub(tx.gasUsed*tx.effectiveGasPrice))
-        }
-        expect(await lendingPool.tokenURI(1)).to.eq(`https://nft.llamalend.com/nft/31337/${lendingPool.address.toLowerCase()}/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1`)
+    it("has expected starting conditions", async function() {
+        expect(await this.nft.ownerOf(683972)).to.equal(userAddress);
+    });
 
-        expect(Number(await lendingPool.currentAnnualInterest(0))).to.be.approximately(0.16e18, 200000)
-        expect(Number(await lendingPool.currentAnnualInterest(eth01))).to.be.approximately(0.24e18, 200000)
-        await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
-        //await network.provider.send("evm_mine")
-        await expect(lendingPool.connect(liquidator).claw(0, 0)).to.be.revertedWith("not expired");
-        expect(Number((await lendingPool.infoToRepayLoan(1)).totalRepay)).to.be.approximately((0.16 * 7 / 365 * 0.1 + 0.1) * 1e18, 150000000)
+    it("allows owner to deposit", async function() {
+        await this.lendingPool.deposit({ value: ONE_ETH });
+    });
 
-        {
-            await expect(lendingPool.connect(owner).repay([1], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("not owner")
-            const prevEth = await ethers.provider.getBalance(userAddress);
-            const tx = await (await lendingPool.connect(user).repay([1], {value: (eth01*2).toFixed(0)})).wait()
-            const postEth = await ethers.provider.getBalance(userAddress);
-            console.log("first repay: ", Number(postEth.sub(prevEth).toString()) + (tx.gasUsed*tx.effectiveGasPrice))
-            expect(Number(postEth.sub(prevEth).toString())).to.be.approximately(
-                -Number(ethers.BigNumber.from(price).add((0.16*7/365*0.1e18).toFixed(0)).add(tx.gasUsed*tx.effectiveGasPrice).toString()), 10007356530)
-            expect(await nft.ownerOf(683972)).to.equal(userAddress)
-        }
+    it ("blocks non-owners from depositing", async function() {
+        await expect(this.lendingPool.connect(this.oracle).deposit({ value: ONE_ETH })).to.be.revertedWith("Ownable: caller is not the owner");
+    });
 
-        // can't repay twice
-        await expect(lendingPool.connect(user).repay([1], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+    it("allows owner to add liquidators", async function() {
+        await this.lendingPool.connect(this.owner).addLiquidator(this.liquidator.address)
+    })
 
+    it ("blocks non-owners from adding liquidators", async function() {
+        await expect(this.lendingPool.connect(this.oracle).addLiquidator(this.liquidator.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("blocks non-owners from borrowing NFTs", async function() {
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        await expect(this.lendingPool.connect(this.owner).borrow([683971, 683972], PRICE, DEADLINE, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
+    });
+
+    it("blocks users from borrowing the same NFT twice", async function() {
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        // N.B.: baked into this test is the fact that `user` has already borrowed on Goerli at fork-time
+        await this.nft.connect(this.user).setApprovalForAll(this.lendingPool.address, true);
+
+        await expect(this.lendingPool.connect(this.user).borrow([683971, 683971], PRICE, DEADLINE, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
+    });
+
+    it("sends eth to the user upon borrowing their NFTs", async function() {
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        const prevEth = await ethers.provider.getBalance(userAddress);
+        // N.B.: baked into this test is the fact that `user` has already borrowed on Goerli at fork-time
+        const pendingTx = await this.lendingPool.connect(this.user).borrow([683971, 683972], PRICE, DEADLINE, signature.v, signature.r, signature.s);
+        
+        const tx = await pendingTx.wait();
+
+        const postEth = await ethers.provider.getBalance(userAddress);
+
+        expect(await this.nft.ownerOf(683971)).to.equal(this.lendingPool.address)
+
+        expect(postEth.sub(prevEth)).to.be.equal(ethers.BigNumber.from(PRICE).mul(2).sub(tx.gasUsed * tx.effectiveGasPrice))
+    });
+
+    it("prevents non-owners from repaying loans", async function() {
+        await expect(this.lendingPool.connect(this.owner).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
+    });
+
+    it("returns a correct tokenURI", async function () {
+        expect(await this.lendingPool.tokenURI(1)).to.eq(`https://nft.llamalend.com/nft/31337/${this.lendingPool.address.toLowerCase()}/0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b/1`)
+    });
+
+    it("returns correct interest rates", async function () {
+        expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.be.approximately(0.16e18, 200000)
+        expect(Number(await this.lendingPool.currentAnnualInterest(ONE_TENTH_OF_AN_ETH))).to.be.approximately(0.24e18, 200000)
+    });
+
+    it("does not allow liquidation of unexpired loans", async function () {
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         await network.provider.send("evm_mine")
-        expect(Number(await lendingPool.currentAnnualInterest(0))).to.be.approximately(0.08e18, 175459503840000)
+        await expect(this.lendingPool.connect(this.liquidator).claw(0, 0)).to.be.revertedWith("not expired");
+    });
 
-        console.log("second loan", (await lendingPool.infoToRepayLoan(0)).totalRepay.toString())
-        expect(Number((await lendingPool.infoToRepayLoan(0)).totalRepay)).to.be.approximately(((0.16 * 7 + 0.08 * 7) / 365 * 0.1 + 0.1) * 1e18, 4604925205000)
-        await lendingPool.connect(liquidator).claw(0, 0);
-        expect(await nft.ownerOf(683971)).to.equal(liquidator.address)
-        await expect(lendingPool.connect(user).repay([0], {value: (eth01*2).toFixed(0)})).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+    it("allows owners to repay their loans", async function () {
+        const prevEth = await ethers.provider.getBalance(userAddress);
+        const tx = await (await this.lendingPool.connect(this.user).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
+        const postEth = await ethers.provider.getBalance(userAddress);
+                
+        console.log("first repay: ", Number(postEth.sub(prevEth).toString()) + (tx.gasUsed * tx.effectiveGasPrice))
+        
+        expect(Number(postEth.sub(prevEth).toString())).to.be.approximately(
+            -Number(ethers.BigNumber.from(PRICE).add((0.16 * 7 / 365 * 0.1e18).toFixed(0)).add(tx.gasUsed * tx.effectiveGasPrice).toString()), 
+            10007356530
+        );
 
-        expect(Number(await lendingPool.currentAnnualInterest(0))).to.eq(0)
+        expect(await this.nft.ownerOf(683972)).to.equal(userAddress)
+    });
 
-        const signature2 = await sign(oracle, price, deadline+1e8, nftContract)
-        await expect(factory.connect(user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
-        await lendingPool.connect(user).borrow([683972, 683973, 683974], price, deadline+1e8, signature2.v, signature2.r, signature2.s)
-        await factory.connect(owner).emergencyShutdown([0])
-        await expect(lendingPool.connect(user).borrow([683975], price, deadline+1e8, signature2.v, signature2.r, signature2.s))
+    it("blocks owners from repaying the same loan twice", async function () {      
+        await expect(this.lendingPool.connect(this.user).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+    });
+
+    it("accrues interest over time", async function () {
+        await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
+        await network.provider.send("evm_mine")
+        expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.be.approximately(0.08e18, 175459503840000)
+    })
+
+    it("allows liquidation of expired loans", async function () {
+        console.log("second loan", (await this.lendingPool.infoToRepayLoan(0)).totalRepay.toString())
+        expect(Number((await this.lendingPool.infoToRepayLoan(0)).totalRepay)).to.be.approximately(((0.16 * 7 + 0.08 * 7) / 365 * 0.1 + 0.1) * 1e18, 4604925205000)
+        await this.lendingPool.connect(this.liquidator).claw(0, 0);
+        expect(await this.nft.ownerOf(683971)).to.equal(this.liquidator.address)
+        await expect(this.lendingPool.connect(this.user).repay([0], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+    })
+
+    it("correctly handles emergency shutdowns", async function () {
+        expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.eq(0)
+
+        const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address)
+        await expect(this.factory.connect(this.user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
+        
+        await this.lendingPool.connect(this.user).borrow([683972, 683973, 683974], PRICE, DEADLINE + 1e8, signature2.v, signature2.r, signature2.s)
+        await this.factory.connect(this.owner).emergencyShutdown([0])
+        await expect(this.lendingPool.connect(this.user).borrow([683975], PRICE, DEADLINE + 1e8, signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
+    });
 
-        await expect(lendingPool.connect(user).withdraw(await ethers.provider.getBalance(lendingPool.address))).to.be.revertedWith("Ownable: caller is not the owner");
-        await lendingPool.withdraw(await ethers.provider.getBalance(lendingPool.address))
+    it ("blocks non-owners from withdrawing", async function () {
+        await expect(this.lendingPool.connect(this.user).withdraw(await ethers.provider.getBalance(this.lendingPool.address))).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("allows owners to withdraw", async function() {
+        await this.lendingPool.withdraw(await ethers.provider.getBalance(this.lendingPool.address))
     })
 })
