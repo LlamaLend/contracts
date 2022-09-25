@@ -133,7 +133,6 @@ contract LendingPool is Ownable, ERC721A {
     function repay(uint[] calldata loanIds) external payable updateInterest(msg.value) {
         uint length = loanIds.length;
         uint totalToRepay = 0;
-        addDailyBorrows(0); // todo: this is path dependent because of the min() but maybe if we remove this it's still ok?
         for(uint i=0; i<length; i++){
             totalToRepay += _repay(loanIds[i]);
         }
