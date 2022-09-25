@@ -1,17 +1,22 @@
-const {getContract} = require('../scripts/utils')
+const { deployAll } = require('../scripts/utils')
 const fetch = require("node-fetch")
+
+// Only works on mainnet forks
 
 describe("Prod Oracle", function () {
   it("oracle", async function () {
-    const { lendingPool } = await getContract("LendingPool", ["0xab2f947d22ab9ccfc34c9d257fce971c05042b59", "100000000000000000"])
-    const {price, deadline, signature} = await fetch("https://api.tubbysea.com/quote/tubby").then(r=>r.json())
+    const { lendingPool } = await deployAll(
+      "0x4096b3f0e89c06e98d1095da7aefdd4b38eeb1e0", // oracle
+      "60000000000000000", // 0.06 eth (_maxPrice)
+      "0xCa7cA7BcC765F77339bE2d648BA53ce9c8a262bD", // tubby cats (_nftContract)
+      "1000000000000000000", // 1 eth (_maxDailyBorrows)
+      "TubbyLoan", // (_name_)
+      "TL", // (_symbol)
+      "1209600", // 2 weeks (_maxLoanLength)
+      "25367833587", // 80% p.a. (_maxInterestPerEthPerSecond)
+    )
+    const { price, deadline, signature } = await fetch("https://oracle.llamalend.com/quote/1/0xCa7cA7BcC765F77339bE2d648BA53ce9c8a262bD").then(r => r.json())
     await lendingPool.setMaxPrice("1000000000000000000000000000")
     await lendingPool.checkOracle(price, deadline, signature.v, signature.r, signature.s)
-})
-it("goerli oracle", async function () {
-  const LendingPool = await hre.ethers.getContractFactory("LendingPool");
-  const lendingPool = await LendingPool.attach("0x73243f724272d5049314428f848e2a4bb273e630");
-  const {price, deadline, signature} = await fetch("https://api.tubbysea.com/quote/tubby").then(r=>r.json())
-  await lendingPool.checkOracle(price, deadline, signature.v, signature.r, signature.s)
-})
+  })
 })
