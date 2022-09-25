@@ -115,27 +115,28 @@ contract LendingPool is Ownable, ERC721A {
     function _repay(uint loanId) internal returns (uint) {
         require(ownerOf(loanId) == msg.sender, "not owner");
         Loan storage loan = loans[loanId];
+        uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
-        uint interest = ((sumInterestPerEth - loan.startInterestSum) * loan.borrowed) / 1e18;
+        uint interest = ((sumInterestPerEth - loan.startInterestSum) * borrowed) / 1e18;
         if(sinceLoanStart > maxLoanLength){
             uint loanEnd = loan.startTime + maxLoanLength;
-            interest += ((block.timestamp - loanEnd)*loan.borrowed)/(1 days);
+            interest += ((block.timestamp - loanEnd)*borrowed)/(1 days);
         }
         _burn(loanId);
-        totalBorrowed -= loan.borrowed;
+        totalBorrowed -= borrowed;
 
         if(sinceLoanStart < (1 days)){
             uint until24h;
             unchecked {
                 until24h = (1 days) - sinceLoanStart;
             }
-            uint toReduce = Math.min((loan.borrowed*until24h)/(1 days), currentDailyBorrows);
+            uint toReduce = Math.min((borrowed*until24h)/(1 days), currentDailyBorrows);
             currentDailyBorrows = currentDailyBorrows - toReduce;
             emit ReducedDailyBorrows(currentDailyBorrows, toReduce);
         }
 
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
-        return interest + loan.borrowed;
+        return interest + borrowed;
     }
 
     function repay(uint[] calldata loanIds) external payable updateInterest {
