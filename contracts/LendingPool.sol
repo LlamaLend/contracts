@@ -24,9 +24,9 @@ contract LendingPool is Ownable, ERC721A {
     address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
-    uint public sumInterestPerEth = 0;
+    uint public sumInterestPerEth; // = 0;
     uint public lastUpdate;
-    uint public totalBorrowed = 0;
+    uint public totalBorrowed; // = 0;
     mapping(uint=>Loan) public loans;
     string private baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
