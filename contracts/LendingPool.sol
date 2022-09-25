@@ -123,7 +123,6 @@ contract LendingPool is Ownable, ERC721A {
         }
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
-        nftContract.transferFrom(address(this), msg.sender, loan.nft);
 
         if(sinceLoanStart < (1 days)){
             uint until24h;
@@ -135,6 +134,7 @@ contract LendingPool is Ownable, ERC721A {
             emit ReducedDailyBorrows(currentDailyBorrows, toReduce);
         }
 
+        nftContract.transferFrom(address(this), msg.sender, loan.nft);
         return interest + loan.borrowed;
     }
 
@@ -249,7 +249,7 @@ contract LendingPool is Ownable, ERC721A {
         return liquidators.length;
     }
 
-    function setBaseURI(string memory newBaseURI) external onlyOwner {
+    function setBaseURI(string calldata newBaseURI) external onlyOwner {
         baseURI = newBaseURI;
     }
 
