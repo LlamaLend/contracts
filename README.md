@@ -65,9 +65,12 @@ Essentially a similar reason why defi projects provide liquidity for their own c
 - Oracle signatures don't include chainId to avoid gas, so if you plan to deploy this code on other chains, don't do it with the same oracle address and an NFT with the same address as one currently live on mainnet since if you do that oracle messages would be replayable on the other chain.
 
 ## Developing
+
+Copy `.env.example`, updating `PRIVATEKEY` and setting a value for `ETHERSCAN` (if you want to verify).
+
 ```shell
+npm install --save-dev
 npm test
-npx hardhat coverage
 npx hardhat deploy --network rinkeby
 npx hardhat etherscan-verify --network rinkeby
 npx hardhat verify --network rinkeby DEPLOYED_CONTRACT_ADDRESS
