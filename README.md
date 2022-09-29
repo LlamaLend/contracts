@@ -61,7 +61,6 @@ Providing liquidity is extremely risky for highly illiquid collections without l
 Essentially a similar reason why defi projects provide liquidity for their own coin.
 
 ## Attacks
-- Owner can withdraw liquidity to force rates to go up, but maximum they can go up is to 80% and loans are max 2 weeks, so at most this will lead to an increase of 3.3% in interest. Rate manipulation is also unlikely to happen cause it would stop people from using the market and destoy trust, the opposite of what you want as the collection owner.
 - A MEV bot can sandwitch txs by borrowing max before and repaying max after, makign txs revert. No reason for doing this other than annoying users (at cost to mev bot) and it's easy to solve by using a private mempool.
 
 ## Developing
