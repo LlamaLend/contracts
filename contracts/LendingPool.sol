@@ -13,7 +13,7 @@ contract LendingPool is Ownable, ERC721A {
 
     struct Loan {
         uint nft;
-        uint startInterestSum;
+        uint interest;
         uint40 startTime; // safe until year 231,800
         uint216 borrowed; // would need to borrow 1e+47 ETH -> that much ETH doesnt even exist
     }
@@ -21,11 +21,10 @@ contract LendingPool is Ownable, ERC721A {
     IERC721 public immutable nftContract;
     uint256 public immutable maxLoanLength;
     uint256 public immutable maxInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
+    uint256 public immutable minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
     address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
-    uint public sumInterestPerEth; // = 0;
-    uint public lastUpdate;
     uint public totalBorrowed; // = 0;
     mapping(uint=>Loan) public loans;
     string private baseURI = "https://nft.llamalend.com/nft/";
@@ -39,41 +38,19 @@ contract LendingPool is Ownable, ERC721A {
 
     constructor(address _oracle, uint _maxPrice, address _nftContract,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, address _owner) ERC721A(_name, _symbol)
+        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721A(_name, _symbol)
     {
         require(_oracle != address(0), "oracle can't be 0");
         oracle = _oracle;
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
-        lastUpdate = block.timestamp;
         maxDailyBorrows = _maxDailyBorrows;
         lastUpdateDailyBorrows = block.timestamp;
         maxLoanLength = _maxLoanLength;
         maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
+        minimumInterest = _minimumInterest;
         transferOwnership(_owner);
         factory = msg.sender;
-    }
-
-    modifier updateInterest() {
-        uint elapsed = block.timestamp - lastUpdate;
-        // this can't overflow
-        // if we assume elapsed = 10 years = 10*365*24*3600 = 315360000
-        // and totalBorrowed = 1M eth = 1e6*1e18 = 1e24
-        // then that's only 142.52 bits, way lower than the 256 bits required for it to overflow.
-        // There's one attack where you could blow up totalBorrowed by cycling borrows,
-        // but since this requires a tubby each time it can only be done 20k times, which only increase bits by 14.28 -> still safu
-        // `address(this).balance - msg.value` can never underflow because msg.value is always < address(this).balance
-        sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance - msg.value + totalBorrowed + 1); // +1 prevents divisions by 0
-        lastUpdate = block.timestamp;
-        _;
-    }
-
-    // copy of updateInterest() with msg.value = 0
-    modifier updateInterestNonpayable() {
-        uint elapsed = block.timestamp - lastUpdate;
-        sumInterestPerEth += (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
-        lastUpdate = block.timestamp;
-        _;
     }
 
     function addDailyBorrows(uint toAdd) internal {
@@ -87,10 +64,17 @@ contract LendingPool is Ownable, ERC721A {
     function _borrow(
         uint nftId,
         uint216 price,
+        uint interest,
         uint index) internal {
         require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
-        loans[_nextTokenId() + index] = Loan(nftId, sumInterestPerEth, uint40(block.timestamp), price);
+        loans[_nextTokenId() + index] = Loan(nftId, interest, uint40(block.timestamp), price);
         nftContract.transferFrom(msg.sender, address(this), nftId);
+    }
+
+    function calculateInterest(uint priceOfNextItem) internal view returns (uint interest) {
+        uint borrowed = priceOfNextItem/2 + totalBorrowed;
+        uint variableRate = (borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
+        return minimumInterest + variableRate;
     }
 
     function borrow(
@@ -99,14 +83,15 @@ contract LendingPool is Ownable, ERC721A {
         uint256 deadline,
         uint8 v,
         bytes32 r,
-        bytes32 s) external updateInterestNonpayable {
+        bytes32 s) external {
         checkOracle(price, deadline, v, r, s);
         uint length = nftId.length;
-        totalBorrowed += price * length;
-        for(uint i=0; i<length; i++){
-            _borrow(nftId[i], price, i);
-        }
         uint borrowedNow = price * length;
+        totalBorrowed += borrowedNow;
+        uint interest = calculateInterest(borrowedNow);
+        for(uint i=0; i<length; i++){
+            _borrow(nftId[i], price, interest, i);
+        }
         addDailyBorrows(borrowedNow);
         _mint(msg.sender, length);
         payable(msg.sender).sendValue(borrowedNow);
@@ -117,7 +102,7 @@ contract LendingPool is Ownable, ERC721A {
         Loan storage loan = loans[loanId];
         uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
-        uint interest = ((sumInterestPerEth - loan.startInterestSum) * borrowed) / 1e18;
+        uint interest = (sinceLoanStart * loan.interest * borrowed) / 1e18;
         if(sinceLoanStart > maxLoanLength){
             uint loanEnd = loan.startTime + maxLoanLength;
             interest += ((block.timestamp - loanEnd)*borrowed)/(1 days);
@@ -139,7 +124,7 @@ contract LendingPool is Ownable, ERC721A {
         return interest + borrowed;
     }
 
-    function repay(uint[] calldata loanIds) external payable updateInterest {
+    function repay(uint[] calldata loanIds) external payable {
         uint length = loanIds.length;
         uint totalToRepay = 0;
         for(uint i=0; i<length; i++){
@@ -148,7 +133,7 @@ contract LendingPool is Ownable, ERC721A {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(uint loanId, uint liquidatorIndex) external updateInterestNonpayable {
+    function claw(uint loanId, uint liquidatorIndex) external {
         require(liquidators[liquidatorIndex] == msg.sender);
         Loan storage loan = loans[loanId];
         require(_exists(loanId), "loan closed");
@@ -167,9 +152,9 @@ contract LendingPool is Ownable, ERC721A {
         maxDailyBorrows = _maxDailyBorrows;
     }
 
-    function deposit() external payable onlyOwner updateInterest {}
+    function deposit() external payable onlyOwner {}
 
-    function withdraw(uint amount) external onlyOwner updateInterestNonpayable {
+    function withdraw(uint amount) external onlyOwner {
         payable(msg.sender).sendValue(amount);
     }
 
@@ -201,15 +186,10 @@ contract LendingPool is Ownable, ERC721A {
         require(price < maxPrice, "max price");
     }
 
-    function currentSumInterestPerEth() view public returns (uint) {
-        uint elapsed = block.timestamp - lastUpdate;
-        return sumInterestPerEth + (elapsed * totalBorrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
-    }
-
     function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay, uint principal, uint interest, uint lateFees){
         Loan storage loan = loans[loanId];
         deadline = loan.startTime + maxLoanLength;
-        interest = ((currentSumInterestPerEth() - loan.startInterestSum) * loan.borrowed) / 1e18;
+        interest = ((block.timestamp - loan.startTime) * loan.interest * loan.borrowed) / 1e18;
         if(block.timestamp > deadline){
             lateFees = ((block.timestamp - deadline)*loan.borrowed)/(1 days);
         } else {
@@ -220,8 +200,7 @@ contract LendingPool is Ownable, ERC721A {
     }
 
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
-        uint borrowed = priceOfNextItem + totalBorrowed;
-        return (365 days * borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed + 1);
+        return calculateInterest(priceOfNextItem) * 365 days;
     }
 
     function getDailyBorrows() external view returns (uint dailyBorrows, uint maxDailyBorrowsLimit) {

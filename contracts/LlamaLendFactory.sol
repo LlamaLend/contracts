@@ -1,3 +1,4 @@
+//SPDX-License-Identifier: None
 pragma solidity ^0.8.0;
 
 import './LendingPool.sol';
@@ -20,9 +21,9 @@ contract LlamaLendFactory is Ownable {
     function createPool(
         address _oracle, uint _maxPrice, address _nftContract, 
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxInterestPerEthPerSecond
+        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest
     ) external returns (address pool) {
-        pool = address(new LendingPool(_oracle, _maxPrice, _nftContract, _maxDailyBorrows, _name, _symbol, _maxLoanLength, _maxInterestPerEthPerSecond, msg.sender));
+        pool = address(new LendingPool(_oracle, _maxPrice, _nftContract, _maxDailyBorrows, _name, _symbol, _maxLoanLength, _maxInterestPerEthPerSecond, _minimumInterest, msg.sender));
         allPools.push(pool);
         nftPools[_nftContract].push(pool);
         emit PoolCreated(_nftContract, msg.sender, pool, allPools.length);

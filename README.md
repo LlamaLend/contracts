@@ -77,6 +77,5 @@ npx hardhat verify --network rinkeby DEPLOYED_CONTRACT_ADDRESS
 ```
 
 ## Some future ideas
-- Rate limiting mechanism
 - Allow anyone to LP
-- Farming with underlying ETH?
+- Liquidation systems
