@@ -3,33 +3,38 @@ const { ethers } = require("hardhat");
 async function deployAll(
   _oracle,
   _maxPrice,
-  _nftContract,
   _maxDailyBorrows,
   _name,
   _symbol,
   _maxLoanLength,
   _maxInterestPerEthPerSecond,
+  _minimumInterest,
 ) {
   const Factory = await ethers.getContractFactory("LlamaLendFactory");
   const factory = await Factory.deploy();
   await factory.deployed();
+
+  const MockNft = await ethers.getContractFactory("MockNFT");
+  const mockNft = await MockNft.deploy();
+  await mockNft.deployed();
   
   await factory.createPool(
     _oracle,
     _maxPrice,
-    _nftContract,
+    mockNft.address,
     _maxDailyBorrows,
     _name,
     _symbol,
     _maxLoanLength,
     _maxInterestPerEthPerSecond,
+    _minimumInterest,
   );
 
   const lendingPoolAddress = await factory.allPools(0);
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.attach(lendingPoolAddress)
 
-  return { factory, lendingPool };
+  return { factory, lendingPool, mockNft };
 }
 
 async function sign(signer, price, deadline, nftContract) {
