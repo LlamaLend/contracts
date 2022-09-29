@@ -1,12 +1,14 @@
 //SPDX-License-Identifier: None
 pragma solidity ^0.8.0;
 
-import "../libs/ERC721A.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-contract MockNFT is ERC721A {
-    constructor() ERC721A("Mock NFT", "MOCK"){}
+contract MockNFT is ERC721 {
+    constructor() ERC721("Mock NFT", "MOCK"){}
 
     function mint(uint amount, address to) external {
-        _mint(to, amount);
+        for(uint i = 0; i<amount; i++){
+            _mint(to, i);
+        }
     }
 }
