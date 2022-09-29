@@ -71,8 +71,8 @@ contract LendingPool is Ownable, ERC721A {
         nftContract.transferFrom(msg.sender, address(this), nftId);
     }
 
-    function calculateInterest(uint priceOfNextItem) internal view returns (uint interest) {
-        uint borrowed = priceOfNextItem/2 + totalBorrowed;
+    function calculateInterest(uint priceOfNextItems) internal view returns (uint interest) {
+        uint borrowed = priceOfNextItems/2 + totalBorrowed;
         uint variableRate = (borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
         return minimumInterest + variableRate;
     }
@@ -87,11 +87,11 @@ contract LendingPool is Ownable, ERC721A {
         checkOracle(price, deadline, v, r, s);
         uint length = nftId.length;
         uint borrowedNow = price * length;
-        totalBorrowed += borrowedNow;
         uint interest = calculateInterest(borrowedNow);
         for(uint i=0; i<length; i++){
             _borrow(nftId[i], price, interest, i);
         }
+        totalBorrowed += borrowedNow;
         addDailyBorrows(borrowedNow);
         _mint(msg.sender, length);
         payable(msg.sender).sendValue(borrowedNow);
