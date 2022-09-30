@@ -166,6 +166,7 @@ describe("LendingPool", function () {
         await this.factory.connect(this.owner).emergencyShutdown([0])
         await expect(this.lendingPool.connect(this.user).borrow([4], PRICE, DEADLINE + 1e8, signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
+        await this.lendingPool.connect(this.user).repay([3], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
     });
 
     it ("blocks non-owners from withdrawing", async function () {

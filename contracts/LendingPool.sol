@@ -29,8 +29,8 @@ contract LendingPool is Ownable, ERC721A {
     mapping(uint=>Loan) public loans;
     string private baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
-    uint currentDailyBorrows;
-    uint lastUpdateDailyBorrows;
+    uint216 currentDailyBorrows;
+    uint40 lastUpdateDailyBorrows;
     address[] public liquidators;
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
@@ -45,7 +45,7 @@ contract LendingPool is Ownable, ERC721A {
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
         maxDailyBorrows = _maxDailyBorrows;
-        lastUpdateDailyBorrows = block.timestamp;
+        lastUpdateDailyBorrows = uint40(block.timestamp);
         maxLoanLength = _maxLoanLength;
         maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
@@ -53,11 +53,16 @@ contract LendingPool is Ownable, ERC721A {
         factory = msg.sender;
     }
 
-    function addDailyBorrows(uint toAdd) internal {
+    function addDailyBorrows(uint216 toAdd) internal {
         uint elapsed = block.timestamp - lastUpdateDailyBorrows;
-        currentDailyBorrows = (currentDailyBorrows - Math.min((maxDailyBorrows*elapsed)/(1 days), currentDailyBorrows)) + toAdd;
+        uint toReduce = (maxDailyBorrows*elapsed)/(1 days);
+        if(toReduce > currentDailyBorrows){
+            currentDailyBorrows = toAdd;
+        } else {
+            currentDailyBorrows = uint216(currentDailyBorrows - toReduce) + toAdd;
+        }
         require(currentDailyBorrows < maxDailyBorrows, "max daily borrow");
-        lastUpdateDailyBorrows = block.timestamp;
+        lastUpdateDailyBorrows = uint40(block.timestamp);
         emit Borrowed(currentDailyBorrows, toAdd);
     }
 
@@ -92,7 +97,8 @@ contract LendingPool is Ownable, ERC721A {
             _borrow(nftId[i], price, interest, i);
         }
         totalBorrowed += borrowedNow;
-        addDailyBorrows(borrowedNow);
+        // it's okay to restrict borrowedNow to uint216 because we will send that amount in ETH, and that much ETH doesnt exist
+        addDailyBorrows(uint216(borrowedNow));
         _mint(msg.sender, length);
         payable(msg.sender).sendValue(borrowedNow);
     }
@@ -115,9 +121,17 @@ contract LendingPool is Ownable, ERC721A {
             unchecked {
                 until24h = (1 days) - sinceLoanStart;
             }
-            uint toReduce = Math.min((borrowed*until24h)/(1 days), currentDailyBorrows);
-            currentDailyBorrows = currentDailyBorrows - toReduce;
-            emit ReducedDailyBorrows(currentDailyBorrows, toReduce);
+            uint toReduce = (borrowed*until24h)/(1 days);
+            if(toReduce < currentDailyBorrows){
+                unchecked {
+                    // toReduce < currentDailyBorrows always so it's fine to restrict to uint216 because currentDailyBorrows is uint216 already
+                    currentDailyBorrows = currentDailyBorrows - uint216(toReduce);
+                }
+                emit ReducedDailyBorrows(currentDailyBorrows, toReduce);
+            } else {
+                emit ReducedDailyBorrows(0, currentDailyBorrows);
+                currentDailyBorrows = 0;
+            }
         }
 
         nftContract.transferFrom(address(this), msg.sender, loan.nft);
