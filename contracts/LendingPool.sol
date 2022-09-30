@@ -86,6 +86,7 @@ contract LendingPool is Ownable, ERC721A {
         uint[] calldata nftId,
         uint216 price,
         uint256 deadline,
+        uint256 maxInterest,
         uint8 v,
         bytes32 r,
         bytes32 s) external {
@@ -93,6 +94,7 @@ contract LendingPool is Ownable, ERC721A {
         uint length = nftId.length;
         uint borrowedNow = price * length;
         uint interest = calculateInterest(borrowedNow);
+        require(interest <= maxInterest);
         for(uint i=0; i<length; i++){
             _borrow(nftId[i], price, interest, i);
         }
