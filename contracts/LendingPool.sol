@@ -20,8 +20,8 @@ contract LendingPool is Ownable, ERC721A {
 
     IERC721 public immutable nftContract;
     uint256 public immutable maxLoanLength;
-    uint256 public immutable maxInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
-    uint256 public immutable minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
+    uint256 public maxInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
+    uint256 public minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
     address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
@@ -219,10 +219,11 @@ contract LendingPool is Ownable, ERC721A {
         return calculateInterest(priceOfNextItem) * 365 days;
     }
 
-    function getDailyBorrows() external view returns (uint dailyBorrows, uint maxDailyBorrowsLimit) {
+    function getDailyBorrows() external view returns (uint maxInstantBorrow, uint dailyBorrows, uint maxDailyBorrowsLimit) {
         uint elapsed = block.timestamp - lastUpdateDailyBorrows;
         dailyBorrows = currentDailyBorrows - Math.min((maxDailyBorrows*elapsed)/(1 days), currentDailyBorrows);
         maxDailyBorrowsLimit = maxDailyBorrows;
+        maxInstantBorrow = Math.min(address(this).balance, maxDailyBorrows - dailyBorrows);
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -231,6 +232,11 @@ contract LendingPool is Ownable, ERC721A {
 
     function setMaxPrice(uint newMaxPrice) external onlyOwner {
         maxPrice = newMaxPrice;
+    }
+
+    function changeInterest(uint _maxInterestPerEthPerSecond, uint _minimumInterest) external onlyOwner {
+        maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
+        minimumInterest = _minimumInterest;
     }
 
     function addLiquidator(address liq) external onlyOwner {
