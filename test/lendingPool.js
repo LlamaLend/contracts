@@ -14,6 +14,16 @@ const MAX_INTEREST = "700000000000000000"; // 0.7e18
 const DEADLINE = Math.round(Date.now() / 1000) + 1000;
 const PRICE = ONE_TENTH_OF_AN_ETH;
 
+async function getLoan(lendingPool, n){
+    const loanInfo = await lendingPool.queryFilter(lendingPool.filters.LoanCreated());
+    return {
+        nft: loanInfo[n].args.nft,
+        interest:loanInfo[n].args.interest,
+        startTime:loanInfo[n].args.startTime,
+        borrowed: loanInfo[n].args.borrowed,
+    }
+}
+
 describe("LendingPool", function () {
     let owner;
     let oracle;
@@ -105,11 +115,14 @@ describe("LendingPool", function () {
     });
 
     it("prevents non-owners from repaying loans", async function() {
-        await expect(this.lendingPool.connect(this.owner).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
+        const loanInfo = await getLoan(this.lendingPool, 1);
+        await expect(this.lendingPool.connect(this.owner).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
     });
 
     it("returns a correct tokenURI", async function () {
-        expect(await this.lendingPool.tokenURI(1)).to.eq(`https://nft.llamalend.com/nft/31337/${this.lendingPool.address.toLowerCase()}/${this.nft.address.toLowerCase()}/1`)
+        const loanInfo = await this.lendingPool.queryFilter(this.lendingPool.filters.LoanCreated());
+        const id = loanInfo[0].args.loanId
+        expect(await this.lendingPool.tokenURI(id)).to.eq(`https://nft.llamalend.com/nft/31337/${this.lendingPool.address.toLowerCase()}/${this.nft.address.toLowerCase()}/${id.toString()}`)
     });
 
     it("returns correct interest rates", async function () {
@@ -120,13 +133,15 @@ describe("LendingPool", function () {
     it("does not allow liquidation of unexpired loans", async function () {
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         await network.provider.send("evm_mine")
-        await expect(this.lendingPool.connect(this.liquidator).claw(0, 0)).to.be.revertedWith("not expired");
+        const loanInfo = await getLoan(this.lendingPool, 0);
+        await expect(this.lendingPool.connect(this.liquidator).claw(loanInfo, 0)).to.be.revertedWith("not expired");
     });
 
     it("allows owners to repay their loans", async function () {
-        expect(Number((await this.lendingPool.loans(0)).interest)).to.be.approximately(0.48e18/SECONDS_PER_YEAR, 1e4);
+        const loanInfo = await getLoan(this.lendingPool, 1);
+        expect(Number(loanInfo.interest)).to.be.approximately(0.48e18/SECONDS_PER_YEAR, 1e4);
         const prevEth = await ethers.provider.getBalance(this.user.address);
-        const tx = await (await this.lendingPool.connect(this.user).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
+        const tx = await (await this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
         const postEth = await ethers.provider.getBalance(this.user.address);
                 
         console.log("first repay: ", Number(postEth.sub(prevEth).toString()) + (tx.gasUsed * tx.effectiveGasPrice))
@@ -139,8 +154,9 @@ describe("LendingPool", function () {
         expect(await this.nft.ownerOf(1)).to.equal(this.user.address)
     });
 
-    it("blocks owners from repaying the same loan twice", async function () {      
-        await expect(this.lendingPool.connect(this.user).repay([1], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+    it("blocks owners from repaying the same loan twice", async function () {   
+        const loanInfo = await getLoan(this.lendingPool, 1);
+        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: owner query for nonexistent token");
     });
 
     it("accrues interest over time", async function () {
@@ -150,11 +166,12 @@ describe("LendingPool", function () {
     })
 
     it("allows liquidation of expired loans", async function () {
-        console.log("second loan", (await this.lendingPool.infoToRepayLoan(0)).totalRepay.toString())
-        expect(Number((await this.lendingPool.infoToRepayLoan(0)).totalRepay)).to.be.approximately(((0.48 * 14) / 365 * 0.1 + 0.1) * 1e18, 5604925205000)
-        await this.lendingPool.connect(this.liquidator).claw(0, 0);
+        const loanInfo = await getLoan(this.lendingPool, 0);
+        console.log("second loan", (await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay.toString())
+        expect(Number((await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay)).to.be.approximately(((0.48 * 14) / 365 * 0.1 + 0.1) * 1e18, 5604925205000)
+        await this.lendingPool.connect(this.liquidator).claw(loanInfo, 0);
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
-        await expect(this.lendingPool.connect(this.user).repay([0], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("OwnerQueryForNonexistentToken()");
+        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: owner query for nonexistent token");
     })
 
     it("correctly handles emergency shutdowns", async function () {
@@ -167,7 +184,8 @@ describe("LendingPool", function () {
         await this.factory.connect(this.owner).emergencyShutdown([0])
         await expect(this.lendingPool.connect(this.user).borrow([4], PRICE, DEADLINE + 1e8, MAX_INTEREST, signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
-        await this.lendingPool.connect(this.user).repay([3], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
+        const loanInfo = await getLoan(this.lendingPool, 3);
+        await this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
     });
 
     it ("blocks non-owners from withdrawing", async function () {

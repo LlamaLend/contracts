@@ -2,13 +2,13 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./libs/ERC721A.sol";
+import "./libs/ERC721.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract LendingPool is Ownable, ERC721A {
+contract LendingPool is Ownable, ERC721 {
     using Address for address payable;
 
     struct Loan {
@@ -26,7 +26,6 @@ contract LendingPool is Ownable, ERC721A {
     uint256 public maxPrice;
     address public oracle;
     uint public totalBorrowed; // = 0;
-    mapping(uint=>Loan) public loans;
     string private baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint216 currentDailyBorrows;
@@ -35,10 +34,11 @@ contract LendingPool is Ownable, ERC721A {
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
     event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
+    event LoanCreated(uint indexed loanId, uint nft, uint interest, uint startTime, uint216 borrowed);
 
     constructor(address _oracle, uint _maxPrice, address _nftContract,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721A(_name, _symbol)
+        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721(_name, _symbol)
     {
         require(_oracle != address(0), "oracle can't be 0");
         oracle = _oracle;
@@ -66,13 +66,25 @@ contract LendingPool is Ownable, ERC721A {
         emit Borrowed(currentDailyBorrows, toAdd);
     }
 
+    function getLoanId(
+        uint nftId,
+        uint interest,
+        uint startTime,
+        uint216 price
+    ) public pure returns (uint id) {
+        return uint(keccak256(abi.encode(nftId, interest, startTime, price)));
+    }
+
     function _borrow(
         uint nftId,
         uint216 price,
-        uint interest,
-        uint index) internal {
+        uint interest) internal {
         require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
-        loans[_nextTokenId() + index] = Loan(nftId, interest, uint40(block.timestamp), price);
+        uint id = getLoanId(nftId, interest, block.timestamp, price);
+        require(!_exists(id), "ERC721: token already minted");
+        _owners[id] = msg.sender;
+        emit Transfer(address(0), msg.sender, id);
+        emit LoanCreated(id, nftId, interest, block.timestamp, price);
         nftContract.transferFrom(msg.sender, address(this), nftId);
     }
 
@@ -95,19 +107,32 @@ contract LendingPool is Ownable, ERC721A {
         uint borrowedNow = price * length;
         uint interest = calculateInterest(borrowedNow);
         require(interest <= maxInterest);
-        for(uint i=0; i<length; i++){
-            _borrow(nftId[i], price, interest, i);
+        uint i = 0;
+        while(i<length){
+            _borrow(nftId[i], price, interest);
+            unchecked {
+                i++;
+            }
         }
+        _balances[msg.sender] += length;
         totalBorrowed += borrowedNow;
         // it's okay to restrict borrowedNow to uint216 because we will send that amount in ETH, and that much ETH doesnt exist
         addDailyBorrows(uint216(borrowedNow));
-        _mint(msg.sender, length);
         payable(msg.sender).sendValue(borrowedNow);
     }
 
-    function _repay(uint loanId) internal returns (uint) {
+    function _burnWithoutBalanceChanges(uint tokenId, address owner) internal {
+        // Clear approvals
+        _approve(address(0), tokenId);
+
+        delete _owners[tokenId];
+
+        emit Transfer(owner, address(0), tokenId);
+    }
+
+    function _repay(Loan calldata loan) internal returns (uint) {
+        uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(ownerOf(loanId) == msg.sender, "not owner");
-        Loan storage loan = loans[loanId];
         uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
         uint interest = (sinceLoanStart * loan.interest * borrowed) / 1e18;
@@ -115,7 +140,7 @@ contract LendingPool is Ownable, ERC721A {
             uint loanEnd = loan.startTime + maxLoanLength;
             interest += ((block.timestamp - loanEnd)*borrowed)/(1 days);
         }
-        _burn(loanId);
+        _burnWithoutBalanceChanges(loanId, msg.sender);
         totalBorrowed -= borrowed;
 
         if(sinceLoanStart < (1 days)){
@@ -140,18 +165,23 @@ contract LendingPool is Ownable, ERC721A {
         return interest + borrowed;
     }
 
-    function repay(uint[] calldata loanIds) external payable {
-        uint length = loanIds.length;
+    function repay(Loan[] calldata loansToRepay) external payable {
+        uint length = loansToRepay.length;
         uint totalToRepay = 0;
-        for(uint i=0; i<length; i++){
-            totalToRepay += _repay(loanIds[i]);
+        uint i = 0;
+        while(i<length){
+            totalToRepay += _repay(loansToRepay[i]);
+            unchecked {
+                i++;
+            }
         }
+        _balances[msg.sender] -= length;
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(uint loanId, uint liquidatorIndex) external {
+    function claw(Loan calldata loan, uint liquidatorIndex) external {
         require(liquidators[liquidatorIndex] == msg.sender);
-        Loan storage loan = loans[loanId];
+        uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
         _burn(loanId);
@@ -202,8 +232,7 @@ contract LendingPool is Ownable, ERC721A {
         require(price < maxPrice, "max price");
     }
 
-    function infoToRepayLoan(uint loanId) view external returns (uint deadline, uint totalRepay, uint principal, uint interest, uint lateFees){
-        Loan storage loan = loans[loanId];
+    function infoToRepayLoan(Loan calldata loan) view external returns (uint deadline, uint totalRepay, uint principal, uint interest, uint lateFees){
         deadline = loan.startTime + maxLoanLength;
         interest = ((block.timestamp - loan.startTime) * loan.interest * loan.borrowed) / 1e18;
         if(block.timestamp > deadline){
