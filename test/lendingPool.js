@@ -1,4 +1,5 @@
 const { expect } = require("chai");
+const { BigNumber } = require("ethers");
 const { ethers, network } = require("hardhat");
 const { sign, deployAll } = require('../scripts/utils');
 
@@ -13,6 +14,7 @@ const INTEREST_WEI_PER_ETH_PER_YEAR = 0.8e18;
 const MAX_INTEREST = "700000000000000000"; // 0.7e18
 const DEADLINE = Math.round(Date.now() / 1000) + 1000;
 const PRICE = ONE_TENTH_OF_AN_ETH;
+const MINIMUM_INTEREST = "12683916793"; // 40%
 
 async function getLoan(lendingPool, n){
     const loanInfo = await lendingPool.queryFilter(lendingPool.filters.LoanCreated());
@@ -32,6 +34,7 @@ describe("LendingPool", function () {
     let lendingPool;
     let nft;
     let user;
+    let chainId;
 
     this.beforeAll(async function () {
         const [ _owner, _oracle, _liquidator, _user ] = await ethers.getSigners();
@@ -48,7 +51,7 @@ describe("LendingPool", function () {
             "TL", 
             14 * SECONDS_PER_DAY, 
             Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
-            "12683916793", // 40%
+            MINIMUM_INTEREST,
         );
 
         await mockNft.mint(10, this.user.address);
@@ -56,10 +59,11 @@ describe("LendingPool", function () {
         this.factory = factory;
         this.lendingPool = lendingPool;
         this.nft = mockNft;
+        this.chainId = await _owner.getChainId();
     });
 
     it("accepts signatures from a price oracle", async function () {
-        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         await this.lendingPool.setMaxPrice(ONE_ETH) // 1eth
         await this.lendingPool.checkOracle(PRICE, DEADLINE, signature.v, signature.r, signature.s)
     });
@@ -70,6 +74,10 @@ describe("LendingPool", function () {
 
     it("has expected starting conditions", async function() {
         expect(await this.nft.ownerOf(1)).to.equal(this.user.address);
+    });
+
+    it("currentAnnualInterest() works even when there's 0 eth in contract", async function() {
+        expect(await this.lendingPool.currentAnnualInterest(0)).to.equal(BigNumber.from(MINIMUM_INTEREST).mul(SECONDS_PER_YEAR)); // minimum interest
     });
 
     it("allows owner to deposit", async function() {
@@ -89,19 +97,19 @@ describe("LendingPool", function () {
     });
 
     it("blocks non-owners from borrowing NFTs", async function() {
-        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         await expect(this.lendingPool.connect(this.owner).borrow([0, 1], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
     });
 
     it("blocks users from borrowing the same NFT twice", async function() {
-        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         await this.nft.connect(this.user).setApprovalForAll(this.lendingPool.address, true);
 
         await expect(this.lendingPool.connect(this.user).borrow([0, 0], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
     });
 
     it("sends eth to the user upon borrowing their NFTs", async function() {
-        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address);
+        const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         const prevEth = await ethers.provider.getBalance(this.user.address);
         const pendingTx = await this.lendingPool.connect(this.user).borrow([0, 1], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s);
         
@@ -177,7 +185,7 @@ describe("LendingPool", function () {
     it("correctly handles emergency shutdowns", async function () {
         //expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.eq(0)
 
-        const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address)
+        const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address, this.chainId)
         await expect(this.factory.connect(this.user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
         
         await this.lendingPool.connect(this.user).borrow([1, 2, 3], PRICE, DEADLINE + 1e8, MAX_INTEREST, signature2.v, signature2.r, signature2.s)
