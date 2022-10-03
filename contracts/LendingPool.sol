@@ -245,7 +245,13 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function currentAnnualInterest(uint priceOfNextItem) external view returns (uint interest) {
-        return calculateInterest(priceOfNextItem) * 365 days;
+        uint interestPerSecond;
+        if(address(this).balance + totalBorrowed == 0){
+            interestPerSecond = minimumInterest;
+        } else {
+            interestPerSecond = calculateInterest(priceOfNextItem);
+        }
+        return interestPerSecond * 365 days;
     }
 
     function getDailyBorrows() external view returns (uint maxInstantBorrow, uint dailyBorrows, uint maxDailyBorrowsLimit) {
