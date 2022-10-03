@@ -134,7 +134,7 @@ describe("LendingPool", function () {
         await network.provider.send("evm_increaseTime", [3600 * 24 * 7]) // 1 week
         await network.provider.send("evm_mine")
         const loanInfo = await getLoan(this.lendingPool, 0);
-        await expect(this.lendingPool.connect(this.liquidator).claw(loanInfo, 0)).to.be.revertedWith("not expired");
+        await expect(this.lendingPool.connect(this.liquidator).claw(loanInfo, 0, this.liquidator.address)).to.be.revertedWith("not expired");
     });
 
     it("allows owners to repay their loans", async function () {
@@ -169,7 +169,7 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 0);
         console.log("second loan", (await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay.toString())
         expect(Number((await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay)).to.be.approximately(((0.48 * 14) / 365 * 0.1 + 0.1) * 1e18, 5604925205000)
-        await this.lendingPool.connect(this.liquidator).claw(loanInfo, 0);
+        await this.lendingPool.connect(this.liquidator).claw(loanInfo, 0, this.liquidator.address);
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
         await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: owner query for nonexistent token");
     })

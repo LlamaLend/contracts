@@ -83,8 +83,8 @@ contract LendingPool is Ownable, ERC721 {
         uint id = getLoanId(nftId, interest, block.timestamp, price);
         require(!_exists(id), "ERC721: token already minted");
         _owners[id] = msg.sender;
-        emit Transfer(address(0), msg.sender, id);
         emit LoanCreated(id, nftId, interest, block.timestamp, price);
+        emit Transfer(address(0), msg.sender, id);
         nftContract.transferFrom(msg.sender, address(this), nftId);
     }
 
@@ -179,14 +179,14 @@ contract LendingPool is Ownable, ERC721 {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(Loan calldata loan, uint liquidatorIndex) external {
+    function claw(Loan calldata loan, uint liquidatorIndex, address to) external {
         require(liquidators[liquidatorIndex] == msg.sender);
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
         _burn(loanId);
         totalBorrowed -= loan.borrowed;
-        nftContract.transferFrom(address(this), msg.sender, loan.nft);
+        nftContract.transferFrom(address(this), to, loan.nft);
     }
 
     function setOracle(address newValue) external onlyOwner {
