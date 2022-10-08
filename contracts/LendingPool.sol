@@ -30,11 +30,13 @@ contract LendingPool is Ownable, ERC721 {
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint216 currentDailyBorrows;
     uint40 lastUpdateDailyBorrows;
-    address[] public liquidators;
+    mapping(address => bool) public liquidators;
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
     event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
     event LoanCreated(uint indexed loanId, uint nft, uint interest, uint startTime, uint216 borrowed);
+    event LiquidatorAdded(address liquidator);
+    event LiquidatorRemoved(address liquidator);
 
     constructor(address _oracle, uint _maxPrice, address _nftContract,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
@@ -179,8 +181,8 @@ contract LendingPool is Ownable, ERC721 {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function doEffectiveAltruism(Loan calldata loan, uint liquidatorIndex, address to) external {
-        require(liquidators[liquidatorIndex] == msg.sender);
+    function doEffectiveAltruism(Loan calldata loan, address to) external {
+        require(liquidators[msg.sender] == true);
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
@@ -275,15 +277,13 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function addLiquidator(address liq) external onlyOwner {
-        liquidators.push(liq);
+        liquidators[liq] = true;
+        emit LiquidatorAdded(liq);
     }
 
-    function removeLiquidator(uint index) external onlyOwner {
-        liquidators[index] = address(0);
-    }
-
-    function liquidatorsLength() external view returns (uint){
-        return liquidators.length;
+    function removeLiquidator(address liq) external onlyOwner {
+        liquidators[liq] = false;
+        emit LiquidatorRemoved(liq);
     }
 
     function emergencyShutdown() external {
