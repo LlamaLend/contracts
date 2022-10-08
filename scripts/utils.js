@@ -9,6 +9,7 @@ async function deployAll(
   _maxLoanLength,
   _maxInterestPerEthPerSecond,
   _minimumInterest,
+  _ltv
 ) {
   const Factory = await ethers.getContractFactory("LlamaLendFactory");
   const factory = await Factory.deploy();
@@ -28,6 +29,7 @@ async function deployAll(
     _maxLoanLength,
     _maxInterestPerEthPerSecond,
     _minimumInterest,
+    _ltv,
   );
 
   const lendingPoolAddress = await factory.allPools(0);

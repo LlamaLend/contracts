@@ -22,6 +22,7 @@ contract LendingPool is Ownable, ERC721 {
     uint256 public immutable maxLoanLength;
     uint256 public maxVariableInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
     uint256 public minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
+    uint256 public ltv; // out of 1e18, eg: 33% = 0.33e18
     address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
@@ -40,7 +41,7 @@ contract LendingPool is Ownable, ERC721 {
 
     constructor(address _oracle, uint _maxPrice, address _nftContract,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxVariableInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721(_name, _symbol)
+        uint _maxLoanLength, uint _maxVariableInterestPerEthPerSecond, uint _minimumInterest, uint _ltv, address _owner) ERC721(_name, _symbol)
     {
         require(_oracle != address(0), "oracle can't be 0");
         require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
@@ -52,6 +53,7 @@ contract LendingPool is Ownable, ERC721 {
         maxLoanLength = _maxLoanLength;
         maxVariableInterestPerEthPerSecond = _maxVariableInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
+        ltv = _ltv;
         transferOwnership(_owner);
         factory = msg.sender;
     }
@@ -101,12 +103,18 @@ contract LendingPool is Ownable, ERC721 {
         uint216 price,
         uint256 deadline,
         uint256 maxInterest,
+        uint256 totalToBorrow,
         uint8 v,
         bytes32 r,
         bytes32 s) external {
         checkOracle(price, deadline, v, r, s);
+        // LTV can be manipulated by pool owner to change price in any way, however we check against user provided value so it shouldnt matter
+        // Conversion to uint216 doesnt really matter either because it will only change price if LTV is extremely high
+        // and pool owner can achieve the same anyways by setting a very low LTV
+        price = uint216((price * ltv) / 1e18);
         uint length = nftId.length;
         uint borrowedNow = price * length;
+        require(borrowedNow == totalToBorrow, "ltv changed");
         uint interest = calculateInterest(borrowedNow);
         require(interest <= maxInterest);
         totalBorrowed += borrowedNow;
@@ -274,6 +282,10 @@ contract LendingPool is Ownable, ERC721 {
     function changeInterest(uint _maxInterestPerEthPerSecond, uint _minimumInterest) external onlyOwner {
         maxVariableInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
+    }
+
+    function changeLTV(uint _ltv) external onlyOwner {
+        ltv = _ltv;
     }
 
     function addLiquidator(address liq) external onlyOwner {

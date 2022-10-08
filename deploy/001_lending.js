@@ -28,6 +28,7 @@ const func = async function (hre) {
     "1209600", // 2 weeks
     "25367833587", // 80% p.a.
     "12683916793", // 40% p.a.
+    "330000000000000000", // 33% LTV
   ]
 
   const deployResult = await (await factory.createPool(
