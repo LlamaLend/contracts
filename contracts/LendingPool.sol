@@ -20,7 +20,7 @@ contract LendingPool is Ownable, ERC721 {
 
     IERC721 public immutable nftContract;
     uint256 public immutable maxLoanLength;
-    uint256 public maxInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
+    uint256 public maxVariableInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
     uint256 public minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
     address public immutable factory;
     uint256 public maxPrice;
@@ -38,7 +38,7 @@ contract LendingPool is Ownable, ERC721 {
 
     constructor(address _oracle, uint _maxPrice, address _nftContract,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721(_name, _symbol)
+        uint _maxLoanLength, uint _maxVariableInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721(_name, _symbol)
     {
         require(_oracle != address(0), "oracle can't be 0");
         require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
@@ -48,7 +48,7 @@ contract LendingPool is Ownable, ERC721 {
         maxDailyBorrows = _maxDailyBorrows;
         lastUpdateDailyBorrows = uint40(block.timestamp);
         maxLoanLength = _maxLoanLength;
-        maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
+        maxVariableInterestPerEthPerSecond = _maxVariableInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
         transferOwnership(_owner);
         factory = msg.sender;
@@ -90,7 +90,7 @@ contract LendingPool is Ownable, ERC721 {
 
     function calculateInterest(uint priceOfNextItems) internal view returns (uint interest) {
         uint borrowed = priceOfNextItems/2 + totalBorrowed;
-        uint variableRate = (borrowed * maxInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
+        uint variableRate = (borrowed * maxVariableInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
         return minimumInterest + variableRate;
     }
 
@@ -270,7 +270,7 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function changeInterest(uint _maxInterestPerEthPerSecond, uint _minimumInterest) external onlyOwner {
-        maxInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
+        maxVariableInterestPerEthPerSecond = _maxInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
     }
 
