@@ -179,7 +179,7 @@ contract LendingPool is Ownable, ERC721 {
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
-    function claw(Loan calldata loan, uint liquidatorIndex, address to) external {
+    function doEffectiveAltruism(Loan calldata loan, uint liquidatorIndex, address to) external {
         require(liquidators[liquidatorIndex] == msg.sender);
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
