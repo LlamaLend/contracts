@@ -41,6 +41,7 @@ contract LendingPool is Ownable, ERC721 {
         uint _maxLoanLength, uint _maxInterestPerEthPerSecond, uint _minimumInterest, address _owner) ERC721(_name, _symbol)
     {
         require(_oracle != address(0), "oracle can't be 0");
+        require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
         oracle = _oracle;
         maxPrice = _maxPrice;
         nftContract = IERC721(_nftContract);
@@ -134,13 +135,13 @@ contract LendingPool is Ownable, ERC721 {
         require(ownerOf(loanId) == msg.sender, "not owner");
         uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
+        // No danger of overflow, if it overflows it means that user would need to pay 1e41 eth, which is impossible to pay anyway
         uint interest = (sinceLoanStart * loan.interest * borrowed) / 1e18;
         if(sinceLoanStart > maxLoanLength){
-            uint loanEnd = loan.startTime + maxLoanLength;
-            interest += ((block.timestamp - loanEnd)*borrowed)/(1 days);
+            interest += ((sinceLoanStart - maxLoanLength)*borrowed)/(1 days);
         }
-        _burnWithoutBalanceChanges(loanId, msg.sender);
         totalBorrowed -= borrowed;
+        _burnWithoutBalanceChanges(loanId, msg.sender);
 
         if(sinceLoanStart < (1 days)){
             uint until24h;
@@ -183,8 +184,8 @@ contract LendingPool is Ownable, ERC721 {
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
-        _burn(loanId);
         totalBorrowed -= loan.borrowed;
+        _burn(loanId);
         nftContract.transferFrom(address(this), to, loan.nft);
     }
 
