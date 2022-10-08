@@ -55,13 +55,36 @@ From the users's point of view, their NFTs are extremely safe since:
 
 Imo this is extremely important for NFTs since they are not directly replaceable, so if your nft gets liquidated you just can't get the same one back. Thus for NFT loans these extra asurances are important for users.
 
+However, friendly liquidations are not enforced in the protocol, and they are completely up to the LP. So what I think will end up happening is that we'll see multiple LPs that compete in this market: mercenary LPs that insta liquidate you but offer 40% interest and other LPs that won't insta-liquidate you but who will charge you 80% interest. This will just be a free market and we aim to support everyone through our modular liquidation system.
+
+#### Modular liquidations
+LlamaLend pools don't come with a built-in liquidation system, instead pool owner can attach any liquidation system they want.
+
+Here are some examples:
+- If you want to prioritize dumping NFTs as fast as possible and avoiding any bad debt, you can just allow anyone to liquidate an expired loan by providing the amount borrowed.
+- If you want to maximize amount earned from liquidated NFTs you could run an english or dutch auction on them, with proceeds going to pool owner, borrower, or both.
+- If you want to make it easier for your users to get their NFT back you could implement low late fees, extended repayment plans, manual off-chain liquidations...
+
+The system is extremely flexible and can implement any liquidation logic that people want to use.
+
 ### LPing
 Providing liquidity is extremely risky for highly illiquid collections without liquidation, so it would be quite hard to find people willing to LPs just for the fees. However, collection owners operate with a different set of incentives and for them it makes a lot of sense, since providing that perk to users increases collection value and they have substantial ETH bags allocated to providing value for holders.
 
 Essentially a similar reason why defi projects provide liquidity for their own coin.
 
+### Late repayment fees
+An issue I found multiple times with the previous iteration of llamalend is that people like to wait till the literal last second to repay, and that means that it's quite common that their loan expires a few seconds before their repay, meaning that you have to liquidate them. This is quite bothersome and not a great user experience so I introduced late fees: after a loan has expired you can still repay it but you need to pay an extra late fee that increases linearly by 100% of borrowed amount every 24h. In other words, from the moment a loan expires we start charging an extra interest of 36,500%.
+
+The goal of this is not to charge that insane interest but to provide a way for users that are slightly late (eg up to a few hours) to still repay their loan, moving repayment from a cliff to a steep slope instead.
+
 ## Attacks
 - A MEV bot can sandwitch txs by borrowing max before and repaying max after, makign txs revert. No reason for doing this other than annoying users (at cost to mev bot) and it's easy to solve by using a private mempool.
+
+## Risks for LPs
+- You are selling put options on NFTs, if NFT price drops >66% before some loan expires, user will likely not repay and you'll get the NFT at a loss.
+- Contracts could have a bug
+- Oracle could have a bug or key could be leaked, which would allow hackers to borrow at any price below the on-chain price limit you have set.
+- Oracle could be manipulated by inflating price for a week or by manipulating our data sources, which would make it possible to borrow for incorrect prices up to on-chain price limit.
 
 ## Developing
 
@@ -77,4 +100,3 @@ npx hardhat verify --network rinkeby DEPLOYED_CONTRACT_ADDRESS
 
 ## Some future ideas
 - Allow anyone to LP
-- Liquidation systems
