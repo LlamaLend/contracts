@@ -31,7 +31,7 @@ Interest is determined by pool utilization rate following a x=yk curve capped at
 - No liquidations
 - Pay as you go
 - Works for ultra smol/illiquid collections
-- Variable rates
+- Fixed rates based on pool utilization
 
 ### Oracle
 Traditional oracles like those used in all lending protocols are too expensive to operate because they continuously post prices on-chain and that makes the cost extremely high for an NFT that is likely to see very little borrowing volume. Furthermore, oracle networks are unlikely to build feeds for very small NFTs.
