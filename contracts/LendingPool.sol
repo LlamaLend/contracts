@@ -26,7 +26,7 @@ contract LendingPool is Ownable, ERC721 {
     uint256 public maxPrice;
     address public oracle;
     uint public totalBorrowed; // = 0;
-    string private baseURI = "https://nft.llamalend.com/nft/";
+    string private constant baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint216 currentDailyBorrows;
     uint40 lastUpdateDailyBorrows;
@@ -79,7 +79,6 @@ contract LendingPool is Ownable, ERC721 {
         uint nftId,
         uint216 price,
         uint interest) internal {
-        require(nftContract.ownerOf(nftId) == msg.sender, "not owner");
         uint id = getLoanId(nftId, interest, block.timestamp, price);
         require(!_exists(id), "ERC721: token already minted");
         _owners[id] = msg.sender;
@@ -107,6 +106,7 @@ contract LendingPool is Ownable, ERC721 {
         uint borrowedNow = price * length;
         uint interest = calculateInterest(borrowedNow);
         require(interest <= maxInterest);
+        totalBorrowed += borrowedNow;
         uint i = 0;
         while(i<length){
             _borrow(nftId[i], price, interest);
@@ -115,7 +115,6 @@ contract LendingPool is Ownable, ERC721 {
             }
         }
         _balances[msg.sender] += length;
-        totalBorrowed += borrowedNow;
         // it's okay to restrict borrowedNow to uint216 because we will send that amount in ETH, and that much ETH doesnt exist
         addDailyBorrows(uint216(borrowedNow));
         payable(msg.sender).sendValue(borrowedNow);
@@ -284,10 +283,6 @@ contract LendingPool is Ownable, ERC721 {
 
     function liquidatorsLength() external view returns (uint){
         return liquidators.length;
-    }
-
-    function setBaseURI(string calldata newBaseURI) external onlyOwner {
-        baseURI = newBaseURI;
     }
 
     function emergencyShutdown() external {

@@ -98,14 +98,14 @@ describe("LendingPool", function () {
 
     it("blocks non-owners from borrowing NFTs", async function() {
         const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
-        await expect(this.lendingPool.connect(this.owner).borrow([0, 1], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
+        await expect(this.lendingPool.connect(this.owner).borrow([0, 1], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("ERC721: transfer caller is not owner nor approved");
     });
 
     it("blocks users from borrowing the same NFT twice", async function() {
         const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         await this.nft.connect(this.user).setApprovalForAll(this.lendingPool.address, true);
 
-        await expect(this.lendingPool.connect(this.user).borrow([0, 0], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("not owner");
+        await expect(this.lendingPool.connect(this.user).borrow([0, 0], PRICE, DEADLINE, MAX_INTEREST, signature.v, signature.r, signature.s)).to.be.revertedWith("ERC721: token already minted");
     });
 
     it("sends eth to the user upon borrowing their NFTs", async function() {
@@ -202,9 +202,5 @@ describe("LendingPool", function () {
 
     it("allows owners to withdraw", async function() {
         await this.lendingPool.withdraw(await ethers.provider.getBalance(this.lendingPool.address))
-    })
-    
-    it("setBaseURI", async function() {
-        await this.lendingPool.setBaseURI("abc")
     })
 })
