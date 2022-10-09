@@ -47,5 +47,14 @@ describe('ListNfts', function () {
 
     // in the range 1-100 inclusive three were minted to a different user
     expect(owners.length).to.equal(97);
+
+    const owners2 = await listNfts.getOwnedNfts(
+      owner.address,
+      mockNFT.address,
+      101,
+      201
+    );
+    // the remaining 5 will show up here.
+    expect(owners2.length).to.equal(5);
   });
 });
