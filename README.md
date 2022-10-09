@@ -80,7 +80,7 @@ An issue I found multiple times with the previous iteration of llamalend is that
 The goal of this is not to charge that insane interest but to provide a way for users that are slightly late (eg up to a few hours) to still repay their loan, moving repayment from a cliff to a steep slope instead.
 
 ## Attacks
-- A MEV bot can sandwitch txs by borrowing max before and repaying max after, makign txs revert. No reason for doing this other than annoying users (at cost to mev bot) and it's easy to solve by using a private mempool.
+- A MEV bot can sandwitch txs by borrowing max before and repaying max after, making txs revert. No reason for doing this other than annoying users (at cost to mev bot) and it's easy to solve by using a private mempool.
 
 ## Risks for LPs
 - You are selling put options on NFTs, if NFT price drops >66% before some loan expires, user will likely not repay and you'll get the NFT at a loss.
