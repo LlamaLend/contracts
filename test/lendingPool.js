@@ -172,7 +172,7 @@ describe("LendingPool", function () {
 
     it("blocks owners from repaying the same loan twice", async function () {   
         const loanInfo = await getLoan(this.lendingPool, 1);
-        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: owner query for nonexistent token");
+        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     });
 
     it("accrues interest over time", async function () {
@@ -187,7 +187,7 @@ describe("LendingPool", function () {
         expect(Number((await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay)).to.be.approximately(((0.48 * 14) / 365 * 0.1 + 0.1) * 1e18, 5604925205000)
         await this.lendingPool.connect(this.liquidator).doEffectiveAltruism(loanInfo, this.liquidator.address);
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
-        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: owner query for nonexistent token");
+        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     })
 
     it("correctly handles emergency shutdowns", async function () {
@@ -210,5 +210,30 @@ describe("LendingPool", function () {
 
     it("allows owners to withdraw", async function() {
         await this.lendingPool.withdraw(await ethers.provider.getBalance(this.lendingPool.address))
+    })
+
+    it("cant send loan nfts to 0x0", async function() {
+        const loanInfo = await getLoan(this.lendingPool, 4);
+        const loanId = await this.lendingPool.getLoanId(loanInfo.nft, loanInfo.interest, loanInfo.startTime, loanInfo.borrowed)
+        await expect(this.lendingPool.connect(this.user).transferFrom(this.user.address, "0x0000000000000000000000000000000000000000", loanId))
+            .to.be.revertedWith('ERC721: transfer to the zero address');
+    })
+
+    it("cant call emergencyShutdown() directly", async function() {
+        await expect(this.lendingPool.emergencyShutdown()).to.be.revertedWith('');
+    })
+
+    it("can't be initialized twice", async function() {
+        await expect(this.lendingPool.initialize(
+            this.oracle.address,
+            ONE_TENTH_OF_AN_ETH,
+            startMaxDailyBorrows,
+            "TubbyLoan",
+            "TL",
+            Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
+            MINIMUM_INTEREST,
+            LTV,
+            this.user.address
+        )).to.be.revertedWith("Initializable: contract is already initialized");
     })
 })

@@ -2,13 +2,14 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./libs/ERC721.sol";
+import "./libs/upgradeable/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Clone} from "./libs/Clone.sol";
 
-contract LendingPool is Ownable, ERC721 {
+contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     using Address for address payable;
 
     struct Loan {
@@ -18,12 +19,9 @@ contract LendingPool is Ownable, ERC721 {
         uint216 borrowed; // would need to borrow 1e+47 ETH -> that much ETH doesnt even exist
     }
 
-    IERC721 public immutable nftContract;
-    uint256 public immutable maxLoanLength;
     uint256 public maxVariableInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
     uint256 public minimumInterest; // eg: 40% p.a. = 12683916793 ~ 0.4e18 / 1 years;
     uint256 public ltv; // out of 1e18, eg: 33% = 0.33e18
-    address public immutable factory;
     uint256 public maxPrice;
     address public oracle;
     uint public totalBorrowed; // = 0;
@@ -39,23 +37,33 @@ contract LendingPool is Ownable, ERC721 {
     event LiquidatorAdded(address liquidator);
     event LiquidatorRemoved(address liquidator);
 
-    constructor(address _oracle, uint _maxPrice, address _nftContract,
+    function nftContract() public pure returns (IERC721) {
+        return IERC721(_getArgAddress(0));
+    }
+
+    function factory() public pure returns (address) {
+        return _getArgAddress(20);
+    }
+
+    function maxLoanLength() public pure returns (uint256) {
+        return _getArgUint256(40);
+    }
+
+    function initialize(address _oracle, uint _maxPrice,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint _maxLoanLength, uint _maxVariableInterestPerEthPerSecond, uint _minimumInterest, uint _ltv, address _owner) ERC721(_name, _symbol)
+        uint _maxVariableInterestPerEthPerSecond, uint _minimumInterest, uint _ltv, address _owner) initializer public
     {
+        __Ownable_init_unchained();
+        __ERC721_init_unchained(_name, _symbol);
         require(_oracle != address(0), "oracle can't be 0");
-        require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
         oracle = _oracle;
         maxPrice = _maxPrice;
-        nftContract = IERC721(_nftContract);
         maxDailyBorrows = _maxDailyBorrows;
         lastUpdateDailyBorrows = uint40(block.timestamp);
-        maxLoanLength = _maxLoanLength;
         maxVariableInterestPerEthPerSecond = _maxVariableInterestPerEthPerSecond;
         minimumInterest = _minimumInterest;
         ltv = _ltv;
         transferOwnership(_owner);
-        factory = msg.sender;
     }
 
     function addDailyBorrows(uint216 toAdd) internal {
@@ -89,7 +97,7 @@ contract LendingPool is Ownable, ERC721 {
         _owners[id] = msg.sender;
         emit LoanCreated(id, nftId, interest, block.timestamp, price);
         emit Transfer(address(0), msg.sender, id);
-        nftContract.transferFrom(msg.sender, address(this), nftId);
+        nftContract().transferFrom(msg.sender, address(this), nftId);
     }
 
     function calculateInterest(uint priceOfNextItems) internal view returns (uint interest) {
@@ -147,8 +155,8 @@ contract LendingPool is Ownable, ERC721 {
         uint sinceLoanStart = block.timestamp - loan.startTime;
         // No danger of overflow, if it overflows it means that user would need to pay 1e41 eth, which is impossible to pay anyway
         uint interest = (sinceLoanStart * loan.interest * borrowed) / 1e18;
-        if(sinceLoanStart > maxLoanLength){
-            interest += ((sinceLoanStart - maxLoanLength)*borrowed)/(1 days);
+        if(sinceLoanStart > maxLoanLength()){
+            interest += ((sinceLoanStart - maxLoanLength())*borrowed)/(1 days);
         }
         totalBorrowed -= borrowed;
         _burnWithoutBalanceChanges(loanId, msg.sender);
@@ -171,7 +179,7 @@ contract LendingPool is Ownable, ERC721 {
             }
         }
 
-        nftContract.transferFrom(address(this), msg.sender, loan.nft);
+        nftContract().transferFrom(address(this), msg.sender, loan.nft);
         return interest + borrowed;
     }
 
@@ -194,10 +202,10 @@ contract LendingPool is Ownable, ERC721 {
         require(liquidators[msg.sender] == true);
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
-        require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
+        require(block.timestamp > (loan.startTime + maxLoanLength()), "not expired");
         totalBorrowed -= loan.borrowed;
         _burn(loanId);
-        nftContract.transferFrom(address(this), to, loan.nft);
+        nftContract().transferFrom(address(this), to, loan.nft);
     }
 
     function setOracle(address newValue) external onlyOwner {
@@ -231,7 +239,7 @@ contract LendingPool is Ownable, ERC721 {
                         price,
                         deadline,
                         block.chainid,
-                        address(nftContract)
+                        address(nftContract())
                     )
                 ),
                 v,
@@ -244,7 +252,7 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function infoToRepayLoan(Loan calldata loan) view external returns (uint deadline, uint totalRepay, uint principal, uint interest, uint lateFees){
-        deadline = loan.startTime + maxLoanLength;
+        deadline = loan.startTime + maxLoanLength();
         interest = ((block.timestamp - loan.startTime) * loan.interest * loan.borrowed) / 1e18;
         if(block.timestamp > deadline){
             lateFees = ((block.timestamp - deadline)*loan.borrowed)/(1 days);
@@ -273,7 +281,7 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/", Strings.toHexString(uint160(address(nftContract)), 20), "/"));
+        return string(abi.encodePacked(baseURI, Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/", Strings.toHexString(uint160(address(nftContract())), 20), "/"));
     }
 
     function setMaxPrice(uint newMaxPrice) external onlyOwner {
@@ -300,7 +308,7 @@ contract LendingPool is Ownable, ERC721 {
     }
 
     function emergencyShutdown() external {
-        require(msg.sender == factory);
+        require(msg.sender == factory());
         maxPrice = 0; // prevents new borrows
     }
 

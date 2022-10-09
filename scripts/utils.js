@@ -11,8 +11,12 @@ async function deployAll(
   _minimumInterest,
   _ltv
 ) {
+  const LendingPoolImplementation = await ethers.getContractFactory("LendingPool");
+  const lendingPoolImplementation = await LendingPoolImplementation.deploy();
+  await lendingPoolImplementation.deployed();
+
   const Factory = await ethers.getContractFactory("LlamaLendFactory");
-  const factory = await Factory.deploy();
+  const factory = await Factory.deploy(lendingPoolImplementation.address);
   await factory.deployed();
 
   const MockNft = await ethers.getContractFactory("MockNFT");
