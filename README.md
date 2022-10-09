@@ -24,7 +24,7 @@ We tackle all these problems by exploiting a market structure present in lots of
 ## How does it work?
 Users can deposit their NFTs, get a signed price attestation from a server, and borrow 1/3rd of the floor value of these NFTs in ETH. Then they have up to 2 weeks to repay the loan, but they can repay at any time and will only be charged interest for the time used. 
 
-Interest is determined by pool utilization rate following a x=yk curve capped at 80%, only owner can provide ETH for borrowing and, if any loans expire, NFTs are just transferred to pool owner.
+Interest is fixed at loan creation and is determined by pool utilization rate, only owner can provide ETH for borrowing and, if any loans expire, NFTs are just transferred to pool owner.
 
 ## Key features
 - Completely trustless, can't rug
@@ -47,6 +47,8 @@ And if owner is the one operating the oracle, they just need to trust themselves
 On top of that, this oracle is extremely cheap to operate since it never needs to make any transaction, which also avoids all complexity of dealing with high gas, nonces... Only a regular web server is needed! And to top it off, it fails very safely, since if the server fails all that happens is that no new loans will be available until it's fixed, while in other lending protocols a stale oracle can cause protocol to be drained.
 
 And even in the worst case scenario where server gets completely compromised and private key is leaked, there's a price ceiling that can be set by owner and which can block any attempts to steal owner's ETH by borrowing at inflated prices.
+
+For more info on oracle methodology and how we prevent price manipulation check [our oracle docs](https://github.com/LlamaLend/oracle).
 
 ### Liquidations
 From the users's point of view, their NFTs are extremely safe since:
