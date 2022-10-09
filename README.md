@@ -88,6 +88,11 @@ The goal of this is not to charge that insane interest but to provide a way for 
 - Oracle could have a bug or key could be leaked, which would allow hackers to borrow at any price below the on-chain price limit you have set.
 - Oracle could be manipulated by inflating price for a week or by manipulating our data sources, which would make it possible to borrow for incorrect prices up to on-chain price limit.
 
+## Admin powers
+Factory owner (which is me, 0xngmi) can trigger emergencyShutdown(), a function that will prevent new loans from being created. This is meant to be used in case we identify a bug or if oracle is compromised.
+
+That's the only admin function llamalend has, and this function doesnt affect in any way loan repayments, deposits or withdrawals, just stops new loans, meaning that it's impossible to use this function to rug.
+
 ## Developing
 
 Copy `.env.example`, updating `PRIVATEKEY` and setting a value for `ETHERSCAN` (if you want to verify).
