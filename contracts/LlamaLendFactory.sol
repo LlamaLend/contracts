@@ -8,22 +8,12 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 contract LlamaLendFactory is Ownable {
     using Clones for address;
 
-    mapping(address => address[]) public nftPools;
-    address[] public allPools;
     LendingPool public immutable implementation;
 
-    event PoolCreated(address indexed nftContract, address indexed owner, address pool, uint);
+    event PoolCreated(address indexed nftContract, address indexed owner, address pool);
 
     constructor(LendingPool implementation_) {
         implementation = implementation_;
-    }
-
-    function allPoolsLength() external view returns (uint) {
-        return allPools.length;
-    }
-
-    function nftPoolsLength(address nftContract) external view returns (uint) {
-        return nftPools[nftContract].length;
     }
 
     function createPool(
@@ -34,14 +24,12 @@ contract LlamaLendFactory is Ownable {
         require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
         pool = LendingPool(address(implementation).clone());
         pool.initialize(_oracle, _maxPrice, _maxDailyBorrows, _name, _symbol, interests, msg.sender, _nftContract, address(this), _maxLoanLength);
-        allPools.push(address(pool));
-        nftPools[_nftContract].push(address(pool));
-        emit PoolCreated(_nftContract, msg.sender, address(pool), allPools.length);
+        emit PoolCreated(_nftContract, msg.sender, address(pool));
     }
 
-    function emergencyShutdown(uint[] calldata pools) external onlyOwner {
+    function emergencyShutdown(address[] calldata pools) external onlyOwner {
         for(uint i = 0; i < pools.length; i++){
-            LendingPool(allPools[pools[i]]).emergencyShutdown();
+            LendingPool(pools[i]).emergencyShutdown();
         }
     }
 }

@@ -38,7 +38,8 @@ async function deployAll(
     },
   );
 
-  const lendingPoolAddress = await factory.allPools(0);
+  const pools = await factory.queryFilter(factory.filters.PoolCreated());
+  const lendingPoolAddress = pools[0].args.pool
   const LendingPool = await ethers.getContractFactory("LendingPool");
   const lendingPool = await LendingPool.attach(lendingPoolAddress)
 

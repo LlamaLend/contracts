@@ -194,10 +194,10 @@ describe("LendingPool", function () {
         //expect(Number(await this.lendingPool.currentAnnualInterest(0))).to.eq(0)
 
         const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address, this.chainId)
-        await expect(this.factory.connect(this.user).emergencyShutdown([0])).to.be.revertedWith('Ownable: caller is not the owner');
+        await expect(this.factory.connect(this.user).emergencyShutdown([this.lendingPool.address])).to.be.revertedWith('Ownable: caller is not the owner');
         
         await this.lendingPool.connect(this.user).borrow([1, 2, 3], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 3), signature2.v, signature2.r, signature2.s)
-        await this.factory.connect(this.owner).emergencyShutdown([0])
+        await this.factory.connect(this.owner).emergencyShutdown([this.lendingPool.address])
         await expect(this.lendingPool.connect(this.user).borrow([4], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 1), signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
         const loanInfo = await getLoan(this.lendingPool, 3);
