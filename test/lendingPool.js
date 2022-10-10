@@ -231,9 +231,9 @@ describe("LendingPool", function () {
             "TubbyLoan",
             "TL",
             {
-                _maxVariableInterestPerEthPerSecond: Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
-                _minimumInterest: MINIMUM_INTEREST,
-                _ltv: LTV,
+                maxVariableInterestPerEthPerSecond: Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
+                minimumInterest: MINIMUM_INTEREST,
+                ltv: LTV,
             },
             this.user.address,
             this.nft.address,

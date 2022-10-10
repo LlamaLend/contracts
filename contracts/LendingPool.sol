@@ -18,10 +18,10 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint40 startTime; // safe until year 231,800
         uint216 borrowed; // would need to borrow 1e+47 ETH -> that much ETH doesnt even exist
     }
-    struct Interests {
-        uint _maxVariableInterestPerEthPerSecond;
-        uint _minimumInterest;
-        uint _ltv;
+    struct Interests { // Hack to get around "stack to deep" error in createPool()
+        uint maxVariableInterestPerEthPerSecond;
+        uint minimumInterest;
+        uint ltv;
     }
 
     uint256 public maxVariableInterestPerEthPerSecond; // eg: 80% p.a. = 25367833587 ~ 0.8e18 / 1 years;
@@ -47,7 +47,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
 
     function initialize(address _oracle, uint _maxPrice,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        Interests memory interests, address _owner,
+        Interests calldata interests, address _owner,
         address _nftContract, address _factory, uint _maxLoanLength) initializer public
     {
         __Ownable_init_unchained();
@@ -57,9 +57,9 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         maxPrice = _maxPrice;
         maxDailyBorrows = _maxDailyBorrows;
         lastUpdateDailyBorrows = uint40(block.timestamp);
-        maxVariableInterestPerEthPerSecond = interests._maxVariableInterestPerEthPerSecond;
-        minimumInterest = interests._minimumInterest;
-        ltv = interests._ltv;
+        maxVariableInterestPerEthPerSecond = interests.maxVariableInterestPerEthPerSecond;
+        minimumInterest = interests.minimumInterest;
+        ltv = interests.ltv;
         transferOwnership(_owner);
         nftContract = IERC721(_nftContract);
         factory = _factory;

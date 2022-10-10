@@ -7,9 +7,9 @@ async function deployAll(
   _name,
   _symbol,
   _maxLoanLength,
-  _maxVariableInterestPerEthPerSecond,
-  _minimumInterest,
-  _ltv
+  maxVariableInterestPerEthPerSecond,
+  minimumInterest,
+  ltv
 ) {
   const LendingPoolImplementation = await ethers.getContractFactory("LendingPool");
   const lendingPoolImplementation = await LendingPoolImplementation.deploy();
@@ -32,9 +32,9 @@ async function deployAll(
     _symbol,
     _maxLoanLength,
     {
-      _maxVariableInterestPerEthPerSecond,
-      _minimumInterest,
-      _ltv,
+      maxVariableInterestPerEthPerSecond,
+      minimumInterest,
+      ltv,
     },
   );
 
