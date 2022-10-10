@@ -7,7 +7,7 @@ async function deployAll(
   _name,
   _symbol,
   _maxLoanLength,
-  _maxInterestPerEthPerSecond,
+  _maxVariableInterestPerEthPerSecond,
   _minimumInterest,
   _ltv
 ) {
@@ -31,9 +31,11 @@ async function deployAll(
     _name,
     _symbol,
     _maxLoanLength,
-    _maxInterestPerEthPerSecond,
-    _minimumInterest,
-    _ltv,
+    {
+      _maxVariableInterestPerEthPerSecond,
+      _minimumInterest,
+      _ltv,
+    },
   );
 
   const lendingPoolAddress = await factory.allPools(0);

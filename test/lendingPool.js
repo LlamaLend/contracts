@@ -230,10 +230,15 @@ describe("LendingPool", function () {
             startMaxDailyBorrows,
             "TubbyLoan",
             "TL",
-            Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
-            MINIMUM_INTEREST,
-            LTV,
-            this.user.address
+            {
+                _maxVariableInterestPerEthPerSecond: Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
+                _minimumInterest: MINIMUM_INTEREST,
+                _ltv: LTV,
+            },
+            this.user.address,
+            this.nft.address,
+            this.factory.address,
+            SECONDS_PER_DAY,
         )).to.be.revertedWith("Initializable: contract is already initialized");
     })
 })
