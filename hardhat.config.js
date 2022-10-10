@@ -42,6 +42,11 @@ module.exports = {
       accounts: [process.env.PRIVATEKEY],
       gasMultiplier: 1.5,
     },
+    fuji: {
+      url: 'https://rpc.ankr.com/avalanche_fuji',
+      accounts: [process.env.PRIVATEKEY],
+      gasMultiplier: 1.5,
+    },
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN
