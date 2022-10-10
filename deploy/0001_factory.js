@@ -7,10 +7,11 @@ const func = async function (hre) {
     }
   
     const {deployer} = await getNamedAccounts();
+    const LlamaLendImplementationDeployment = await deployments.get('LendingPool');
   
     await deploy('LlamaLendFactory', {
       from: deployer,
-      args: [],
+      args: [LlamaLendImplementationDeployment.address],
       log: true,
       autoMine: true, // speed up deployment on local network (ganache, hardhat), no effect on live networks
       //deterministicDeployment: true,
@@ -18,4 +19,4 @@ const func = async function (hre) {
   };
   module.exports = func;
   func.tags = ['LlamaLendFactory'];
-  
+  func.dependencies = ['LendingPoolImplementation'];

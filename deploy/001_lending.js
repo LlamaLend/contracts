@@ -38,9 +38,8 @@ const func = async function (hre) {
     }
   )).wait()
 
-  const poolAddress = deployResult.events[2].args.pool
+  const poolAddress = deployResult.events[3].args.pool
   log(`contract LendingPool deployed at ${poolAddress}`);
-  log(`You can verify it on etherscan by running "npx hardhat verify --network goerli ${poolAddress} ${params.join(" ")} ${deployer}"`);
 };
 module.exports = func;
 func.tags = ['LendingPool'];
