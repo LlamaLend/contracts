@@ -27,9 +27,9 @@ const func = async function (hre) {
     "TL",
     "1209600", // 2 weeks
     {
-      _maxVariableInterestPerEthPerSecond: "25367833587", // 80% p.a.
-      _minimumInterest: "12683916793", // 40% p.a.
-      _ltv: "330000000000000000", // 33% LTV
+      maxVariableInterestPerEthPerSecond: "25367833587", // 80% p.a.
+      minimumInterest: "12683916793", // 40% p.a.
+      ltv: "330000000000000000", // 33% LTV
     }
   ]
 
