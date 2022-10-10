@@ -31,7 +31,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     address public oracle;
     address public factory;
     IERC721 public nftContract;
-    uint256 public maxLoanLength;
+    uint96 public maxLoanLength;
     uint public totalBorrowed; // = 0;
     string private constant baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
@@ -48,7 +48,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     function initialize(address _oracle, uint _maxPrice,
         uint _maxDailyBorrows, string memory _name, string memory _symbol,
         Interests calldata interests, address _owner,
-        address _nftContract, address _factory, uint _maxLoanLength) initializer public
+        address _nftContract, address _factory, uint96 _maxLoanLength) initializer public
     {
         __Ownable_init_unchained();
         __ERC721_init_unchained(_name, _symbol);
