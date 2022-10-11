@@ -74,8 +74,9 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         } else {
             unchecked {
                 // Resulting daily borrow has to be over 10^47 ETH
-                currentDailyBorrows = uint216(currentDailyBorrows - toReduce) + toAdd;
+                currentDailyBorrows = uint216(currentDailyBorrows - toReduce);
             }
+            currentDailyBorrows += toAdd;
         }
         require(currentDailyBorrows < maxDailyBorrows, "max daily borrow");
         lastUpdateDailyBorrows = uint40(block.timestamp);
