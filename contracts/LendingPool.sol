@@ -202,6 +202,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         while(i<length) {
             unchecked {
                 totalToRepay += _repay(loansToRepay[i], from);
+                i++;
             }
         }
         _balances[from] -= length;
