@@ -148,9 +148,9 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         emit Transfer(owner, address(0), tokenId);
     }
 
-    function _repay(Loan calldata loan) internal returns (uint) {
+    function _repay(Loan calldata loan, address from) internal returns (uint) {
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
-        require(ownerOf(loanId) == msg.sender, "not owner");
+        require(ownerOf(loanId) == from, "not owner");
         uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
         // No danger of overflow, if it overflows it means that user would need to pay 1e41 eth, which is impossible to pay anyway
@@ -159,7 +159,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
             interest += ((sinceLoanStart - maxLoanLength)*borrowed)/(1 days);
         }
         totalBorrowed -= borrowed;
-        _burnWithoutBalanceChanges(loanId, msg.sender);
+        _burnWithoutBalanceChanges(loanId, from);
 
         if(sinceLoanStart < (1 days)){
             uint until24h;
@@ -179,22 +179,23 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
             }
         }
 
-        nftContract.transferFrom(address(this), msg.sender, loan.nft);
+        nftContract.transferFrom(address(this), from, loan.nft);
         return interest + borrowed;
     }
 
-    function repay(Loan[] calldata loansToRepay) external payable {
+    function repay(Loan[] calldata loansToRepay, address from) external payable {
+        require(msg.sender == from || msg.sender == factory); // Factory enforces that from is msg.sender
         uint length = loansToRepay.length;
         uint totalToRepay = 0;
         uint i = 0;
         while(i<length){
-            totalToRepay += _repay(loansToRepay[i]);
+            totalToRepay += _repay(loansToRepay[i], from);
             unchecked {
                 i++;
             }
         }
-        _balances[msg.sender] -= length;
-        payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
+        _balances[from] -= length;
+        payable(from).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
     // Liquidate expired loan
