@@ -132,7 +132,10 @@ describe("LendingPool", function () {
 
     it("prevents non-owners from repaying loans", async function() {
         const loanInfo = await getLoan(this.lendingPool, 1);
-        await expect(this.lendingPool.connect(this.owner).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
+        await expect(this.factory.connect(this.owner).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo]
+        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
     });
 
     it("returns a correct tokenURI", async function () {
@@ -157,7 +160,10 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         expect(Number(loanInfo.interest)).to.be.approximately(0.48e18/SECONDS_PER_YEAR, 1e4);
         const prevEth = await ethers.provider.getBalance(this.user.address);
-        const tx = await (await this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
+        const tx = await (await this.factory.connect(this.user).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo]
+        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
         const postEth = await ethers.provider.getBalance(this.user.address);
                 
         console.log("first repay: ", Number(postEth.sub(prevEth).toString()) + (tx.gasUsed * tx.effectiveGasPrice))
@@ -172,7 +178,10 @@ describe("LendingPool", function () {
 
     it("blocks owners from repaying the same loan twice", async function () {   
         const loanInfo = await getLoan(this.lendingPool, 1);
-        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
+        await expect(this.factory.connect(this.user).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo]
+        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     });
 
     it("accrues interest over time", async function () {
@@ -187,7 +196,10 @@ describe("LendingPool", function () {
         expect(Number((await this.lendingPool.infoToRepayLoan(loanInfo)).totalRepay)).to.be.approximately(((0.48 * 14) / 365 * 0.1 + 0.1) * 1e18, 5604925205000)
         await this.lendingPool.connect(this.liquidator).doEffectiveAltruism(loanInfo, this.liquidator.address);
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
-        await expect(this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
+        await expect(this.factory.connect(this.user).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo]
+        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     })
 
     it("correctly handles emergency shutdowns", async function () {
@@ -201,7 +213,10 @@ describe("LendingPool", function () {
         await expect(this.lendingPool.connect(this.user).borrow([4], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 1), signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
         const loanInfo = await getLoan(this.lendingPool, 3);
-        await this.lendingPool.connect(this.user).repay([loanInfo], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
+        await this.factory.connect(this.user).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo]
+        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
     });
 
     it ("blocks non-owners from withdrawing", async function () {
