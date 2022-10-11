@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract LlamaLendFactory is Ownable {
     using Clones for address;
+    using Address for address payable;
 
     LendingPool public immutable implementation;
 
@@ -31,5 +32,21 @@ contract LlamaLendFactory is Ownable {
         for(uint i = 0; i < pools.length; i++){
             LendingPool(pools[i]).emergencyShutdown();
         }
+    }
+
+    struct LoanRepayment {
+        address pool;
+        LendingPool.Loan[] loans;
+    }
+    function repay(LoanRepayment[] calldata loansToRepay) external payable {
+        uint length = loansToRepay.length;
+        uint i = 0;
+        while(i<length){
+            LendingPool(loansToRepay[i].pool).repay{value: address(this).balance}(loansToRepay[i].loans, msg.sender);
+            unchecked {
+                i++;
+            }
+        }
+        payable(msg.sender).sendValue(address(this).balance);
     }
 }
