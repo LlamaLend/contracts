@@ -160,10 +160,7 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         expect(Number(loanInfo.interest)).to.be.approximately(0.48e18/SECONDS_PER_YEAR, 1e4);
         const prevEth = await ethers.provider.getBalance(this.user.address);
-        const tx = await (await this.factory.connect(this.user).repay([{
-            pool: this.lendingPool.address,
-            loans: [loanInfo]
-        }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
+        const tx = await (await this.lendingPool.connect(this.user).repay([loanInfo], this.user.address, { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).wait()
         const postEth = await ethers.provider.getBalance(this.user.address);
                 
         console.log("first repay: ", Number(postEth.sub(prevEth).toString()) + (tx.gasUsed * tx.effectiveGasPrice))
