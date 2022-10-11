@@ -184,7 +184,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function repay(Loan[] calldata loansToRepay, address from) external payable {
-        require(msg.sender == factory || msg.sender == from);
+        require(msg.sender == from || msg.sender == factory); // Factory enforces that from is msg.sender
         uint length = loansToRepay.length;
         uint totalToRepay = 0;
         uint i = 0;
