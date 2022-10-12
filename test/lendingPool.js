@@ -134,7 +134,8 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         await expect(this.factory.connect(this.owner).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
     });
 
@@ -177,7 +178,8 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         await expect(this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     });
 
@@ -195,7 +197,8 @@ describe("LendingPool", function () {
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
         await expect(this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     })
 
@@ -205,14 +208,15 @@ describe("LendingPool", function () {
         const signature2 = await sign(this.oracle, PRICE, DEADLINE + 1e8, this.nft.address, this.chainId)
         await expect(this.factory.connect(this.user).emergencyShutdown([this.lendingPool.address])).to.be.revertedWith('Ownable: caller is not the owner');
         
-        await this.lendingPool.connect(this.user).borrow([1, 2, 3], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 3), signature2.v, signature2.r, signature2.s)
+        await this.lendingPool.connect(this.user).borrow([1, 2, 3, 4], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 4), signature2.v, signature2.r, signature2.s)
         await this.factory.connect(this.owner).emergencyShutdown([this.lendingPool.address])
         await expect(this.lendingPool.connect(this.user).borrow([4], PRICE, DEADLINE + 1e8, MAX_INTEREST, totalToBorrow(PRICE, 1), signature2.v, signature2.r, signature2.s))
             .to.be.revertedWith("max price");
         const loanInfo = await getLoan(this.lendingPool, 3);
         await this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
     });
 
@@ -229,6 +233,44 @@ describe("LendingPool", function () {
         const loanId = await this.lendingPool.getLoanId(loanInfo.nft, loanInfo.interest, loanInfo.startTime, loanInfo.borrowed)
         await expect(this.lendingPool.connect(this.user).transferFrom(this.user.address, "0x0000000000000000000000000000000000000000", loanId))
             .to.be.revertedWith('ERC721: transfer to the zero address');
+    })
+
+    it("repay from multiple pools", async function () {
+        await this.factory.createPool(
+            this.oracle.address,
+            ONE_ETH,
+            this.nft.address,
+            startMaxDailyBorrows,
+            "TubbyLoan",
+            "TL",
+            SECONDS_PER_DAY,
+            {
+                maxVariableInterestPerEthPerSecond: Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
+                minimumInterest: MINIMUM_INTEREST,
+                ltv: LTV,
+            },
+        )
+        const pools = await this.factory.queryFilter(this.factory.filters.PoolCreated());
+        const lendingPoolAddress = pools[1].args.pool
+        const LendingPool = await ethers.getContractFactory("LendingPool");
+        const lendingPool2 = await LendingPool.attach(lendingPoolAddress)
+
+        const signature = await sign(this.oracle, PRICE, DEADLINE+1e8, this.nft.address, this.chainId);
+        await this.nft.connect(this.user).setApprovalForAll(lendingPool2.address, true);
+        await lendingPool2.deposit({ value: ONE_ETH });
+        await lendingPool2.connect(this.user).borrow([6], PRICE, DEADLINE+1e8, MAX_INTEREST, totalToBorrow(PRICE, 1), signature.v, signature.r, signature.s)
+
+        const loanInfo1 = await getLoan(this.lendingPool, 5);
+        const loanInfo2 = await getLoan(lendingPool2, 0);
+        await this.factory.connect(this.user).repay([{
+            pool: this.lendingPool.address,
+            loans: [loanInfo1],
+            amount: TWO_TENTHS_OF_AN_ETH
+        }, {
+            pool: lendingPool2.address,
+            loans: [loanInfo2],
+            amount: TWO_TENTHS_OF_AN_ETH
+        }], { value: ONE_ETH })
     })
 
     it("cant call emergencyShutdown() directly", async function() {

@@ -36,17 +36,21 @@ contract LlamaLendFactory is Ownable {
 
     struct LoanRepayment {
         address pool;
+        uint amount;
         LendingPool.Loan[] loans;
     }
     function repay(LoanRepayment[] calldata loansToRepay) external payable {
         uint length = loansToRepay.length;
         uint i = 0;
         while(i<length){
-            LendingPool(loansToRepay[i].pool).repay{value: address(this).balance}(loansToRepay[i].loans, msg.sender);
+            LendingPool(loansToRepay[i].pool).repay{value: loansToRepay[i].amount}(loansToRepay[i].loans, msg.sender);
             unchecked {
                 i++;
             }
         }
-        payable(msg.sender).sendValue(address(this).balance);
+        uint bal = address(this).balance;
+        if(bal > 0){
+            payable(msg.sender).sendValue(bal);
+        }
     }
 }
