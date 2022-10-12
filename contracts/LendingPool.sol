@@ -195,7 +195,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
             }
         }
         _balances[from] -= length;
-        payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
+        payable(from).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
     // Liquidate expired loan

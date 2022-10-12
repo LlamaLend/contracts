@@ -134,7 +134,8 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         await expect(this.factory.connect(this.owner).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("not owner");
     });
 
@@ -177,7 +178,8 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 1);
         await expect(this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     });
 
@@ -195,7 +197,8 @@ describe("LendingPool", function () {
         expect(await this.nft.ownerOf(0)).to.equal(this.liquidator.address)
         await expect(this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })).to.be.revertedWith("ERC721: invalid token ID");
     })
 
@@ -212,7 +215,8 @@ describe("LendingPool", function () {
         const loanInfo = await getLoan(this.lendingPool, 3);
         await this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo]
+            loans: [loanInfo],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: (Number(ONE_TENTH_OF_AN_ETH) * 2).toFixed(0) })
     });
 
@@ -260,10 +264,12 @@ describe("LendingPool", function () {
         const loanInfo2 = await getLoan(lendingPool2, 0);
         await this.factory.connect(this.user).repay([{
             pool: this.lendingPool.address,
-            loans: [loanInfo1]
+            loans: [loanInfo1],
+            amount: TWO_TENTHS_OF_AN_ETH
         }, {
             pool: lendingPool2.address,
-            loans: [loanInfo2]
+            loans: [loanInfo2],
+            amount: TWO_TENTHS_OF_AN_ETH
         }], { value: ONE_ETH })
     })
 
