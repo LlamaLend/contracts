@@ -49,4 +49,6 @@ contract LlamaLendFactory is Ownable {
         }
         payable(msg.sender).sendValue(address(this).balance);
     }
+
+    receive() external payable {}
 }
