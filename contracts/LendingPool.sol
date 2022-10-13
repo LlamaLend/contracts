@@ -129,10 +129,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         require(borrowedNow == totalToBorrow, "ltv changed");
         uint interest = calculateInterest(borrowedNow);
         require(interest <= maxInterest);
-        unchecked {
-            // There isn't enough eth to overflow and probably will never be :bat: :loud_sound:
-            totalBorrowed += borrowedNow;
-        }
+        totalBorrowed += borrowedNow;
         uint i = 0;
         while(i<length){
             _borrow(nftId[i], price, interest);
@@ -201,8 +198,8 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint totalToRepay = 0;
         uint i = 0;
         while(i<length) {
+            totalToRepay += _repay(loansToRepay[i], from);
             unchecked {
-                totalToRepay += _repay(loansToRepay[i], from);
                 i++;
             }
         }
