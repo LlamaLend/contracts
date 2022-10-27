@@ -28,7 +28,7 @@ Interest is fixed at loan creation and is determined by pool utilization rate, o
 
 ## Key features
 - Completely trustless, can't rug
-- No liquidations
+- No liquidations based on price or health-ratio, just need to repay on time
 - Pay as you go
 - Works for ultra smol/illiquid collections
 - Fixed rates based on pool utilization
