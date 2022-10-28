@@ -52,8 +52,8 @@ For more info on oracle methodology and how we prevent price manipulation check 
 
 ### Liquidations
 From the users's point of view, their NFTs are extremely safe since:
-- They can't be liquidated, user just needs to repay on time
-- Even if they are liquidated, liquidator is collection owner that is incentivized to be friendly towards holders, so if liquidation was clearly a mistake it's easy to just talk with them and repay loan manually after liquidation.
+- They can't be liquidated due to price drops, user just needs to repay on time
+- In case user doesn't repay the loan in time and they lose their NFT, liquidator is collection owner that is incentivized to be friendly towards holders, so if liquidation was clearly a mistake it's easy to just talk with them and repay loan manually after liquidation.
 
 Imo this is extremely important for NFTs since they are not directly replaceable, so if your nft gets liquidated you just can't get the same one back. Thus for NFT loans these extra asurances are important for users.
 
