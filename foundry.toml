@@ -2,5 +2,6 @@
 src = 'contracts'
 out = 'out'
 libs = ['lib']
+test = 'foundry-test'
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
