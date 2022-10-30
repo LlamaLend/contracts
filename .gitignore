@@ -1,8 +1,44 @@
-node_modules
-.env
+# -*- mode: gitignore; -*-
+/out
+cache/
+artifacts/
+logs
+*.log
+!/broadcast
+/broadcast/*
+/broadcast/*/31337/
 
-#Hardhat files
-cache
-artifacts
-deployments
+## CVE-2021-21300 style exploits
+.\#*
+
+## General ##
+*~
+\#*\#
+/**/build
+.DS_Store
+node_modules
+tmp/
+_dev/
+coverage/
+/dist
+/build
 bin
+deployments/
+
+## Binary ##
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+## IDE ##
+.secret
+.idea/*
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace

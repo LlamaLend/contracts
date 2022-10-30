@@ -1,22 +1,39 @@
 {
-  "name": "nft-collateral",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "@llamalend/contracts",
+  "version": "0.0.1",
+  "description": "LlamaLend Contracts",
+  "directories": {
+    "contracts": "contracts",
+    "test": "test"
+  },
+  "files": [
+    "/dist/**/*",
+    "/contracts",
+    "/contracts/base",
+    "/contracts/interfaces",
+    "/contracts/libraries",
+    "/artifacts/contracts/**/*.json",
+    "!artifacts/contracts/**/*.dbg.json",
+    "!artifacts/contracts/test/**/*",
+    "!artifacts/contracts/base/**/*"
+  ],
   "scripts": {
-    "test": "hardhat test"
+    "compile": "npx hardhat compile",
+    "coverage": "npx hardhat coverage",
+    "fmt": "npx prettier --config prettier.config.js --write contracts/",
+    "test": "npx hardhat test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0xngmi/nft-collateral.git"
+    "url": "git+https://github.com/LlamaLend/contracts.git"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "SEE LICENSE IN LICENSE",
   "bugs": {
-    "url": "https://github.com/0xngmi/nft-collateral/issues"
+    "url": "https://github.com/LlamaLend/contracts/issues"
   },
-  "homepage": "https://github.com/0xngmi/nft-collateral#readme",
+  "homepage": "https://github.com/LlamaLend/contracts#readme",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
@@ -25,9 +42,11 @@
     "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.4",
-    "hardhat": "^2.6.0",
+    "hardhat": "^2.11.2",
     "hardhat-deploy": "^0.11.11",
-    "hardhat-gas-reporter": "^1.0.8"
+    "hardhat-gas-reporter": "^1.0.8",
+    "prettier": "^2.7.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.24"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.2.0",

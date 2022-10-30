@@ -1,0 +1,79 @@
+[profile.default]
+src = 'contracts'
+test = 'test'
+script = 'script'
+out = 'out'
+libs = ['lib']
+remappings = []
+auto_detect_remappings = true
+libraries = []
+cache = true
+cache_path = 'cache'
+broadcast = 'broadcast'
+allow_paths = []
+include_paths = []
+force = false
+evm_version = 'london'
+gas_reports = ['*']
+gas_reports_ignore = []
+auto_detect_solc = true
+offline = false
+optimizer = true
+optimizer_runs = 200
+verbosity = 0
+ignored_error_codes = [
+    'license',
+    'code-size',
+]
+fs_permissions = []
+build_info = false
+ffi = false
+sender = '0x00a329c0648769a73afac7f9381e08fb43dbea72'
+tx_origin = '0x00a329c0648769a73afac7f9381e08fb43dbea72'
+initial_balance = '0xffffffffffffffffffffffff'
+block_number = 1
+gas_limit = 9223372036854775807
+block_base_fee_per_gas = 0
+block_coinbase = '0x0000000000000000000000000000000000000000'
+block_timestamp = 1
+block_difficulty = 0
+memory_limit = 33554432
+extra_output = []
+extra_output_files = []
+names = false
+sizes = false
+via_ir = false
+no_storage_caching = false
+bytecode_hash = 'ipfs'
+sparse_mode = false
+
+[profile.default.rpc_storage_caching]
+chains = 'all'
+endpoints = 'all'
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = 'long'
+func_attrs_with_params_multiline = true
+quote_style = 'double'
+number_underscore = 'preserve'
+
+[fuzz]
+runs = 256
+max_test_rejects = 65536
+max_global_rejects = 65536
+dictionary_weight = 40
+include_storage = true
+include_push_bytes = true
+
+[invariant]
+runs = 256
+depth = 15
+fail_on_revert = false
+call_override = false
+dictionary_weight = 80
+include_storage = true
+include_push_bytes = true
+
