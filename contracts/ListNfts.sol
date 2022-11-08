@@ -40,7 +40,7 @@ contract ListNfts {
                         owner,
                         balance
                     );
-                    if (tokenId >= start && tokenId < end) {
+                    if (tokenId < end && tokenId >= start)  {
                         nfts[length] = tokenId;
                         unchecked {
                             // unchecked: always less than end minus start
