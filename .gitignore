@@ -6,3 +6,7 @@ cache
 artifacts
 deployments
 bin
+
+#Foundry files
+cache/
+out/
