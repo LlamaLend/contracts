@@ -35,9 +35,9 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     uint public totalBorrowed; // = 0;
     string private constant baseURI = "https://nft.llamalend.com/nft/";
     uint maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
-    uint216 currentDailyBorrows;
+    uint216 currentDailyBorrows; // would have to borrow more eth than will ever exist daily to break
     uint40 lastUpdateDailyBorrows;
-    mapping(address => bool) public liquidators;
+    mapping(address => uint) public liquidators;
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
     event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
@@ -72,7 +72,11 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         if(toReduce > currentDailyBorrows){
             currentDailyBorrows = toAdd;
         } else {
-            currentDailyBorrows = uint216(currentDailyBorrows - toReduce) + toAdd;
+            unchecked {
+                // Resulting daily borrow has to be over 10^47 ETH
+                currentDailyBorrows = uint216(currentDailyBorrows - toReduce);
+            }
+            currentDailyBorrows += toAdd;
         }
         require(currentDailyBorrows < maxDailyBorrows, "max daily borrow");
         lastUpdateDailyBorrows = uint40(block.timestamp);
@@ -158,15 +162,20 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         if(sinceLoanStart > maxLoanLength){
             interest += ((sinceLoanStart - maxLoanLength)*borrowed)/(1 days);
         }
-        totalBorrowed -= borrowed;
+        unchecked {
+            totalBorrowed -= borrowed;
+        }
+        
         _burnWithoutBalanceChanges(loanId, from);
 
         if(sinceLoanStart < (1 days)){
             uint until24h;
+            uint toReduce;
             unchecked {
                 until24h = (1 days) - sinceLoanStart;
+                // Impossible to overflow since borrowed would overflow before this would
+                toReduce = (borrowed*until24h)/(1 days);
             }
-            uint toReduce = (borrowed*until24h)/(1 days);
             if(toReduce < currentDailyBorrows){
                 unchecked {
                     // toReduce < currentDailyBorrows always so it's fine to restrict to uint216 because currentDailyBorrows is uint216 already
@@ -188,7 +197,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint length = loansToRepay.length;
         uint totalToRepay = 0;
         uint i = 0;
-        while(i<length){
+        while(i<length) {
             totalToRepay += _repay(loansToRepay[i], from);
             unchecked {
                 i++;
@@ -200,11 +209,13 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
 
     // Liquidate expired loan
     function doEffectiveAltruism(Loan calldata loan, address to) external {
-        require(liquidators[msg.sender] == true);
+        require(liquidators[msg.sender] == 1);
         uint loanId = getLoanId(loan.nft, loan.interest, loan.startTime, loan.borrowed);
         require(_exists(loanId), "loan closed");
         require(block.timestamp > (loan.startTime + maxLoanLength), "not expired");
-        totalBorrowed -= loan.borrowed;
+        unchecked {
+            totalBorrowed -= loan.borrowed;
+        }
         _burn(loanId);
         nftContract.transferFrom(address(this), to, loan.nft);
     }
@@ -299,12 +310,12 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function addLiquidator(address liq) external onlyOwner {
-        liquidators[liq] = true;
+        liquidators[liq] = 1;
         emit LiquidatorAdded(liq);
     }
 
     function removeLiquidator(address liq) external onlyOwner {
-        liquidators[liq] = false;
+        liquidators[liq] = 0;
         emit LiquidatorRemoved(liq);
     }
 
