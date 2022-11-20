@@ -101,7 +101,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function calculateInterest(uint priceOfNextItems) internal view returns (uint interest) {
-        uint borrowed = priceOfNextItems/2 + totalBorrowed;
+        uint borrowed = (priceOfNextItems >> 1) + totalBorrowed;
         uint variableRate = (borrowed * maxVariableInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
         return minimumInterest + variableRate;
     }

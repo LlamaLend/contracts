@@ -29,8 +29,13 @@ contract LlamaLendFactory is Ownable {
     }
 
     function emergencyShutdown(address[] calldata pools) external onlyOwner {
-        for(uint i = 0; i < pools.length; i++){
-            LendingPool(pools[i]).emergencyShutdown();
+        uint length = pools.length;
+        uint i = 0;
+        while(i < length){
+            LendingPool(pools[i]).emergencyShutdown(); 
+            unchecked {
+                i++;
+            }
         }
     }
 
