@@ -11,27 +11,45 @@ contract LlamaLendFactory is Ownable {
 
     LendingPool public immutable implementation;
 
-    event PoolCreated(address indexed nftContract, address indexed owner, address pool);
+    event PoolCreated(address pool, address owner);
 
     constructor(LendingPool implementation_) {
         implementation = implementation_;
     }
 
+    struct NewPool {
+        uint maxPrice;
+        uint maxLoanLength;
+        address nftContract;
+        uint96 maxVariableInterestPerEthPerSecond;
+        uint96 minimumInterest;
+        uint ltv;
+    }
     function createPool(
-        address _oracle, uint _maxPrice, address _nftContract, 
-        uint _maxDailyBorrows, string memory _name, string memory _symbol,
-        uint96 _maxLoanLength, LendingPool.Interests calldata interests
+        address _oracle, 
+        uint _maxDailyBorrows, string memory _name, string memory _symbol, NewPool[] calldata pools
     ) external payable returns (LendingPool pool) {
-        require(_maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
         pool = LendingPool(address(implementation).clone());
-        pool.initialize(_oracle, _maxPrice, _maxDailyBorrows, _name, _symbol, interests, msg.sender, _nftContract, address(this), _maxLoanLength);
-        payable(pool).sendValue(msg.value);
-        emit PoolCreated(_nftContract, msg.sender, address(pool));
+        pool.initialize(_oracle, _maxDailyBorrows, _name, _symbol, address(this));
+        for(uint i = 0; i<pools.length; i++){
+            NewPool calldata poolParams = pools[i];
+            require(poolParams.maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
+            pool.addCollection(poolParams.nftContract, poolParams.maxPrice, poolParams.minimumInterest, 
+                poolParams.maxVariableInterestPerEthPerSecond, poolParams.ltv, poolParams.maxLoanLength);
+        }
+        pool.transferOwnership(msg.sender);
+        payable(address(pool)).sendValue(msg.value);
+        emit PoolCreated(address(pool), msg.sender);
     }
 
-    function emergencyShutdown(address[] calldata pools) external onlyOwner {
+    struct PoolToShutdown {
+        address pool;
+        address nftContract;
+    }
+    function emergencyShutdown(PoolToShutdown[] calldata pools) external onlyOwner {
         for(uint i = 0; i < pools.length; i++){
-            LendingPool(pools[i]).emergencyShutdown();
+            PoolToShutdown calldata pool = pools[i];
+            LendingPool(pool.pool).emergencyShutdown(pool.nftContract);
         }
     }
 
