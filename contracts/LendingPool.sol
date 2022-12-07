@@ -218,7 +218,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         maxDailyBorrows = _maxDailyBorrows;
     }
 
-    function deposit() external payable onlyOwner {}
+    function deposit() external payable {}
 
     function withdraw(uint amount) external onlyOwner {
         payable(msg.sender).sendValue(amount);
@@ -311,12 +311,5 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     function emergencyShutdown() external {
         require(msg.sender == factory);
         maxPrice = 0; // prevents new borrows
-    }
-
-    fallback() external {
-        // money can still be received through self-destruct, which makes it possible to change balance without calling updateInterest, but if
-        // owner does that -> they are lowering the money they earn through interest
-        // debtor does that -> they always lose money because all loans are < 2 weeks
-        revert();
     }
 }
