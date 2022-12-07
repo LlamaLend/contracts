@@ -30,7 +30,7 @@ module.exports = {
     mainnet: {
       url: process.env.ETH_RPC,
       accounts: [process.env.PRIVATEKEY],
-      gasMultiplier: 1.5,
+      gasMultiplier: 1.1,
     },
     kovan: {
       url: process.env.KOVAN_RPC,
