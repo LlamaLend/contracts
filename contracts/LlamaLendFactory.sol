@@ -34,8 +34,8 @@ contract LlamaLendFactory is Ownable {
         for(uint i = 0; i<pools.length; i++){
             NewPool calldata poolParams = pools[i];
             require(poolParams.maxLoanLength < 1e18, "maxLoanLength too big"); // 31bn years, makes sure that reverts cant be forced through this
-            pool.addCollection(poolParams.nftContract, poolParams.maxPrice, poolParams.minimumInterest, 
-                poolParams.maxVariableInterestPerEthPerSecond, poolParams.ltv, poolParams.maxLoanLength);
+            pool.enablePool(poolParams.nftContract, poolParams.maxVariableInterestPerEthPerSecond, poolParams.minimumInterest, 
+                poolParams.ltv, poolParams.maxPrice, poolParams.maxLoanLength);
         }
         pool.transferOwnership(msg.sender);
         payable(address(pool)).sendValue(msg.value);
@@ -44,12 +44,12 @@ contract LlamaLendFactory is Ownable {
 
     struct PoolToShutdown {
         address pool;
-        address nftContract;
+        bytes32 poolHash;
     }
     function emergencyShutdown(PoolToShutdown[] calldata pools) external onlyOwner {
         for(uint i = 0; i < pools.length; i++){
             PoolToShutdown calldata pool = pools[i];
-            LendingPool(pool.pool).emergencyShutdown(pool.nftContract);
+            LendingPool(pool.pool).emergencyShutdown(pool.poolHash);
         }
     }
 
