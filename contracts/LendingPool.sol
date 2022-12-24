@@ -100,9 +100,23 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         interest = minimumInterest + uint96(variableRate); // variableRate <= maxVariableInterestPerEthPerSecond <= type(uint96).max, so casting is safe
     }
 
+    struct PoolData {
+        address nftContract;
+        uint96 maxVariableInterestPerEthPerSecond;
+        uint96 minimumInterest;
+        uint ltv;
+        uint maxPrice;
+        uint maxLoanLength;
+    }
+
+    struct Signature {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     function borrow(
         // Call params
-        address nftContract,
         uint[] calldata nftId,
         uint216 price,
         uint256 deadline,
@@ -110,32 +124,27 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint256 maxInterest,
         uint256 totalToBorrow,
         // Pool data
-        uint96 maxVariableInterestPerEthPerSecond,
-        uint96 minimumInterest,
-        uint ltv,
-        uint maxPrice,
-        uint maxLoanLength,
+        PoolData calldata poolData, // To get around Stack too deep
         // Signature
-        uint8 v,
-        bytes32 r,
-        bytes32 s) external {
-        checkOracle(nftContract, price, deadline, maxPrice, v, r, s); // Also checks that loans for `nftContract` are accepted in this pool by reverting if maxPrice == 0
-        bytes32 poolHash = getPoolHash(nftContract, maxVariableInterestPerEthPerSecond, minimumInterest, ltv, maxPrice, maxLoanLength);
+        Signature calldata signature // To get around Stack too deep
+    ) external {
+        checkOracle(poolData.nftContract, price, deadline, poolData.maxPrice, signature.v, signature.r, signature.s); // Also checks that loans for `nftContract` are accepted in this pool by reverting if maxPrice == 0
+        bytes32 poolHash = getPoolHash(poolData.nftContract, poolData.maxVariableInterestPerEthPerSecond, poolData.minimumInterest, poolData.ltv, poolData.maxPrice, poolData.maxLoanLength);
         require(pools[poolHash] == 1, "Nonexisting pool");
         // LTV can be manipulated by pool owner to change price in any way, however we check against user provided value so it shouldnt matter
         // Conversion to uint216 doesnt really matter either because it will only change price if LTV is extremely high
         // and pool owner can achieve the same anyways by setting a very low LTV
-        price = uint216((price * ltv) / 1e18);
+        price = uint216((price * poolData.ltv) / 1e18);
         uint length = nftId.length;
         uint borrowedNow = price * length;
         require(borrowedNow == totalToBorrow, "ltv changed");
-        uint96 interest = calculateInterest(borrowedNow, maxVariableInterestPerEthPerSecond, minimumInterest);
+        uint96 interest = calculateInterest(borrowedNow, poolData.maxVariableInterestPerEthPerSecond, poolData.minimumInterest);
         require(interest <= maxInterest);
         totalBorrowed += borrowedNow;
-        uint loanDeadline = block.timestamp + maxLoanLength;
+        uint loanDeadline = block.timestamp + poolData.maxLoanLength;
         uint i = 0;
         while(i<length){
-            _borrow(nftContract, nftId[i], price, interest, loanDeadline);
+            _borrow(poolData.nftContract, nftId[i], price, interest, loanDeadline);
             unchecked {
                 i++;
             }
