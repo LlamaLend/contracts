@@ -53,7 +53,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function addDailyBorrows(uint216 toAdd) internal {
-        uint elapsed = block.timestamp - lastUpdateDailyBorrows;
+        uint elapsed = block.timestamp - uint256(lastUpdateDailyBorrows);
         uint toReduce = (maxDailyBorrows*elapsed)/(1 days);
         if(toReduce > currentDailyBorrows){
             currentDailyBorrows = toAdd;
@@ -96,7 +96,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
 
     function calculateInterest(uint priceOfNextItems, uint96 maxVariableInterestPerEthPerSecond, uint96 minimumInterest) internal view returns (uint96 interest) {
         uint borrowed = priceOfNextItems/2 + totalBorrowed;
-        uint variableRate = (borrowed * maxVariableInterestPerEthPerSecond) / (address(this).balance + totalBorrowed);
+        uint variableRate = (borrowed * uint256(maxVariableInterestPerEthPerSecond)) / (address(this).balance + totalBorrowed);
         interest = minimumInterest + uint96(variableRate); // variableRate <= maxVariableInterestPerEthPerSecond <= type(uint96).max, so casting is safe
     }
 
@@ -134,7 +134,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         // LTV can be manipulated by pool owner to change price in any way, however we check against user provided value so it shouldnt matter
         // Conversion to uint216 doesnt really matter either because it will only change price if LTV is extremely high
         // and pool owner can achieve the same anyways by setting a very low LTV
-        price = uint216((price * poolData.ltv) / 1e18);
+        price = uint216((uint256(price) * poolData.ltv) / 1e18);
         uint length = nftId.length;
         uint borrowedNow = price * length;
         require(borrowedNow == totalToBorrow, "ltv changed");
@@ -170,9 +170,9 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint borrowed = loan.borrowed;
         uint sinceLoanStart = block.timestamp - loan.startTime;
         // No danger of overflow, if it overflows it means that user would need to pay 1e41 eth, which is impossible to pay anyway
-        uint interest = (sinceLoanStart * loan.interest * borrowed) / 1e18;
+        uint interest = (sinceLoanStart * uint256(loan.interest) * borrowed) / 1e18;
         if(block.timestamp > loan.deadline){
-            interest += ((block.timestamp - loan.deadline)*borrowed)/(1 days);
+            interest += ((block.timestamp - uint256(loan.deadline))*borrowed)/(1 days);
         }
         totalBorrowed -= borrowed;
         _burnWithoutBalanceChanges(loanId, from);
