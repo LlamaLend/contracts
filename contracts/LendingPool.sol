@@ -160,7 +160,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
 
     function _burnWithoutBalanceChanges(uint tokenId, address owner) internal {
         // Clear approvals
-        _approve(address(0), tokenId);
+        delete _tokenApprovals[tokenId];
 
         delete _owners[tokenId];
 
@@ -288,9 +288,8 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         interest = ((block.timestamp - loan.startTime) * loan.interest * loan.borrowed) / 1e18;
         if(block.timestamp > loan.deadline){
             lateFees = ((block.timestamp - loan.deadline)*loan.borrowed)/(1 days);
-        } else {
-            lateFees = 0;
         }
+        // else lateFees = 0;
         principal = loan.borrowed;
         totalRepay = principal + interest + lateFees;
     }
