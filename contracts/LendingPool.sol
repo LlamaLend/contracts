@@ -95,6 +95,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         IERC721(nftContract).transferFrom(msg.sender, address(this), nftId);
     }
 
+    // Interest owed to the pool is not included in calculations until the amount is actually received by the pool.
     function calculateInterest(uint priceOfNextItems, uint96 maxVariableInterestPerEthPerSecond, uint96 minimumInterest) internal view returns (uint96 interest) {
         uint borrowed = priceOfNextItems/2 + totalBorrowed;
         uint variableRate = (borrowed * uint256(maxVariableInterestPerEthPerSecond)) / (address(this).balance + totalBorrowed - reservedForWithdrawals);
