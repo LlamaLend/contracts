@@ -38,7 +38,7 @@ contract LlamaLendFactory is Ownable {
                 poolParams.ltv, poolParams.maxPrice, poolParams.maxLoanLength);
         }
         pool.transferOwnership(msg.sender);
-        payable(address(pool)).sendValue(msg.value);
+        pool.deposit{value: msg.value}();
         emit PoolCreated(address(pool), msg.sender);
     }
 
