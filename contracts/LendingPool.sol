@@ -9,6 +9,10 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import {Clone} from "./libs/Clone.sol";
 
+interface Factory {
+    function baseUri() external returns (string memory);
+}
+
 contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     using Address for address payable;
 
@@ -26,7 +30,6 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     address public oracle;
     address public factory;
     uint public totalBorrowed; // = 0;
-    string private constant baseURI = "https://nft.llamalend.com/nft2/";
     uint public maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
     uint public reservedForWithdrawals;
     uint216 public currentDailyBorrows;
@@ -249,7 +252,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
             unchecked{
                 reservedForWithdrawals -= amount;
             }
-        } else if (reservedForWithdrawals != 0{
+        } else if (reservedForWithdrawals != 0){
             reservedForWithdrawals = 0;
         }
     }
@@ -312,7 +315,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/"));
+        return string(abi.encodePacked(Factory(factory).baseURI(), Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/"));
     }
 
     function enablePool(

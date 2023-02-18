@@ -10,6 +10,7 @@ contract LlamaLendFactory is Ownable {
     using Address for address payable;
 
     LendingPool public immutable implementation;
+    string public baseUri =  "https://nft.llamalend.com/nft2/";
 
     event PoolCreated(address pool, address owner);
 
@@ -51,6 +52,10 @@ contract LlamaLendFactory is Ownable {
             PoolToShutdown calldata pool = pools[i];
             LendingPool(pool.pool).emergencyShutdown(pool.poolHash);
         }
+    }
+
+    function setBaseUri(string memory _baseUri) external onlyOwner {
+        baseUri = _baseUri;
     }
 
     struct LoanRepayment {
