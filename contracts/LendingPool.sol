@@ -28,6 +28,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     uint public totalBorrowed; // = 0;
     string private constant baseURI = "https://nft.llamalend.com/nft2/";
     uint public maxDailyBorrows; // IMPORTANT: an attacker can borrow up to 150% of this limit if they prepare beforehand
+    uint public reservedForWithdrawals;
     uint216 public currentDailyBorrows;
     uint40 public lastUpdateDailyBorrows;
     mapping(address => bool) public liquidators;
@@ -96,7 +97,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
 
     function calculateInterest(uint priceOfNextItems, uint96 maxVariableInterestPerEthPerSecond, uint96 minimumInterest) internal view returns (uint96 interest) {
         uint borrowed = priceOfNextItems/2 + totalBorrowed;
-        uint variableRate = (borrowed * uint256(maxVariableInterestPerEthPerSecond)) / (address(this).balance + totalBorrowed);
+        uint variableRate = (borrowed * uint256(maxVariableInterestPerEthPerSecond)) / (address(this).balance + totalBorrowed - reservedForWithdrawals);
         interest = minimumInterest + uint96(variableRate); // variableRate <= maxVariableInterestPerEthPerSecond <= type(uint96).max, so casting is safe
     }
 
@@ -138,6 +139,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         uint length = nftId.length;
         uint borrowedNow = price * length;
         require(borrowedNow == totalToBorrow, "ltv changed");
+        require(borrowedNow <= (address(this).balance - reservedForWithdrawals));
         uint96 interest = calculateInterest(borrowedNow, poolData.maxVariableInterestPerEthPerSecond, poolData.minimumInterest);
         require(interest <= maxInterest);
         totalBorrowed += borrowedNow;
@@ -234,10 +236,21 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         maxDailyBorrows = _maxDailyBorrows;
     }
 
+    function setReservedForWithdrawals(uint _reservedForWithdrawals) external onlyOwner {
+        reservedForWithdrawals = _reservedForWithdrawals;
+    }
+
     function deposit() external payable {}
 
     function withdraw(uint amount) external onlyOwner {
         payable(msg.sender).sendValue(amount);
+        if(amount < reservedForWithdrawals){
+            unchecked{
+                reservedForWithdrawals -= amount;
+            }
+        } else if (reservedForWithdrawals != 0{
+            reservedForWithdrawals = 0;
+        }
     }
 
     function checkOracle(
