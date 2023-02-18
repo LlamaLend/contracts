@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import {Clone} from "./libs/Clone.sol";
 
 interface Factory {
-    function baseUri() external returns (string memory);
+    function baseUri() view external returns (string memory);
 }
 
 contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
@@ -315,7 +315,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     }
 
     function _baseURI() internal view override returns (string memory) {
-        return string(abi.encodePacked(Factory(factory).baseURI(), Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/"));
+        return string(abi.encodePacked(Factory(factory).baseUri(), Strings.toString(block.chainid), "/", Strings.toHexString(uint160(address(this)), 20), "/"));
     }
 
     function enablePool(

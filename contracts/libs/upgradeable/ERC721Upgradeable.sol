@@ -34,7 +34,7 @@ contract ERC721Upgradeable is Initializable, ContextUpgradeable, ERC165Upgradeab
     mapping(address => uint256) internal _balances;
 
     // Mapping from token ID to approved address
-    mapping(uint256 => address) private _tokenApprovals;
+    mapping(uint256 => address) internal _tokenApprovals;
 
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
