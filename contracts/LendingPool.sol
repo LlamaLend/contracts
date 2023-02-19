@@ -35,6 +35,11 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     uint216 public currentDailyBorrows;
     uint40 public lastUpdateDailyBorrows;
     mapping(address => bool) public liquidators;
+    address public immutable feeCollector;
+
+    constructor(address _feeCollector){
+        feeCollector = _feeCollector;
+    }
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
     event LoansRepaid(uint interestEarned, uint numLoans, address repayer);
@@ -222,7 +227,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         }
         _balances[from] -= length;
         emit LoansRepaid(totalInterest, length, from);
-        0xD7F876620bdfF1c9abA5B444128D1722DDD678B3.call{value: totalInterest/10, gas:20000}(""); // we ignore reverts
+        feeCollector.call{value: totalInterest/10, gas:20000}(""); // we ignore reverts
         // we purposefully ignore reverts because otherwise it would be possible to stop repayments and force liquidations
         payable(msg.sender).sendValue(msg.value - (totalBorrowedToRepay + totalInterest)); // underflow checks implictly check that amount is enough
     }

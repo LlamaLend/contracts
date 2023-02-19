@@ -7,17 +7,15 @@ const func = async function (hre) {
     }
   
     const {deployer} = await getNamedAccounts();
-    const FeeCollectorDeployment = await deployments.get('FeeCollector');
   
-    await deploy('LendingPool', {
+    await deploy('FeeCollector', {
       from: deployer,
-      args: [FeeCollectorDeployment.address],
+      args: [],
       log: true,
       autoMine: true, // speed up deployment on local network (ganache, hardhat), no effect on live networks
       //deterministicDeployment: true,
     });
   };
   module.exports = func;
-  func.tags = ['LendingPoolImplementation'];
-  func.dependencies = ['FeeCollector'];
+  func.tags = ['FeeCollector'];
   
