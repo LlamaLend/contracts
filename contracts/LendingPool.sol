@@ -162,13 +162,13 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         payable(msg.sender).sendValue(borrowedNow);
     }
 
-    function _burnWithoutBalanceChanges(uint tokenId, address owner) internal {
+    function _burnWithoutBalanceChanges(uint tokenId, address _owner) internal {
         // Clear approvals
         delete _tokenApprovals[tokenId];
 
         delete _owners[tokenId];
 
-        emit Transfer(owner, address(0), tokenId);
+        emit Transfer(_owner, address(0), tokenId);
     }
 
     function _repay(Loan calldata loan, address from) internal returns (uint) {
@@ -219,7 +219,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         }
         _balances[from] -= length;
         emit LoansRepaid(totalToRepay, length, from);
-        payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
+        payable(msg.sender).sendValue(msg.value - totalToRepay); // underflow checks implictly check that amount is enough
     }
 
     // Liquidate expired loan
