@@ -51,7 +51,7 @@ describe("LendingPool", function () {
 
         const { factory, lendingPool, mockNft } = await deployAll(
             this.oracle.address, 
-            ONE_TENTH_OF_AN_ETH, 
+            ONE_ETH, 
             startMaxDailyBorrows, 
             "TubbyLoan", 
             "TL", 
@@ -69,10 +69,13 @@ describe("LendingPool", function () {
         this.chainId = await _owner.getChainId();
     });
 
+    it("immutable feeReceiver works", async function () {
+        expect(await this.lendingPool.feeCollector()).not.to.eq("0x0000000000000000000000000000000000000000")
+    });
+
     it("accepts signatures from a price oracle", async function () {
         const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
-        await this.lendingPool.setMaxPrice(ONE_ETH) // 1eth
-        await this.lendingPool.checkOracle(PRICE, DEADLINE, signature.v, signature.r, signature.s)
+        await this.lendingPool.checkOracle(this.nft.address, PRICE, DEADLINE, ONE_ETH, signature.v, signature.r, signature.s)
     });
 
     it("can not use expired oracle signatures", async function() {
@@ -112,7 +115,13 @@ describe("LendingPool", function () {
         const signature = await sign(this.oracle, PRICE, DEADLINE, this.nft.address, this.chainId);
         await this.nft.connect(this.user).setApprovalForAll(this.lendingPool.address, true);
 
-        await expect(this.lendingPool.connect(this.user).borrow([0, 0], PRICE, DEADLINE, MAX_INTEREST, totalToBorrow(PRICE, 2), signature.v, signature.r, signature.s)).to.be.revertedWith("ERC721: token already minted");
+        await expect(this.lendingPool.connect(this.user).borrow([0, 0], PRICE, DEADLINE, MAX_INTEREST, totalToBorrow(PRICE, 2),
+            Math.round(INTEREST_WEI_PER_ETH_PER_YEAR / SECONDS_PER_YEAR),
+            MINIMUM_INTEREST,
+            LTV,
+            ONE_ETH,
+            14 * SECONDS_PER_DAY, 
+            signature.v, signature.r, signature.s)).to.be.revertedWith("ERC721: token already minted");
     });
 
     it("sends eth to the user upon borrowing their NFTs", async function() {

@@ -11,8 +11,11 @@ async function deployAll(
   minimumInterest,
   ltv
 ) {
+  const feeCollector = await (await ethers.getContractFactory("FeeCollector")).deploy();
+  await feeCollector.deployed();
+
   const LendingPoolImplementation = await ethers.getContractFactory("LendingPool");
-  const lendingPoolImplementation = await LendingPoolImplementation.deploy();
+  const lendingPoolImplementation = await LendingPoolImplementation.deploy(feeCollector.address);
   await lendingPoolImplementation.deployed();
 
   const Factory = await ethers.getContractFactory("LlamaLendFactory");
@@ -25,17 +28,19 @@ async function deployAll(
   
   await factory.createPool(
     _oracle,
-    _maxPrice,
-    mockNft.address,
     _maxDailyBorrows,
     _name,
     _symbol,
-    _maxLoanLength,
-    {
-      maxVariableInterestPerEthPerSecond,
-      minimumInterest,
-      ltv,
-    },
+    [
+      {
+        maxPrice: _maxPrice,
+        maxLoanLength: _maxLoanLength,
+        nftContract: mockNft.address,
+        maxVariableInterestPerEthPerSecond,
+        minimumInterest,
+        ltv,
+      }
+    ]
   );
 
   const pools = await factory.queryFilter(factory.filters.PoolCreated());
