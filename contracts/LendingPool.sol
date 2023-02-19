@@ -219,6 +219,8 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         }
         _balances[from] -= length;
         emit LoansRepaid(totalToRepay, length, from);
+        0xD7F876620bdfF1c9abA5B444128D1722DDD678B3.call{value: totalToRepay/10, gas:20000}(""); // we ignore reverts
+        // we purposefully ignore reverts because otherwise it would be possible to stop repayments and force liquidations
         payable(msg.sender).sendValue(msg.value - totalToRepay); // underflow checks implictly check that amount is enough
     }
 
