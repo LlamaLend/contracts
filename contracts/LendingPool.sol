@@ -37,6 +37,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
     mapping(address => bool) public liquidators;
 
     event Borrowed(uint currentDailyBorrows, uint newBorrowedAmount);
+    event LoansRepaid(uint interestEarned, uint numLoans, address repayer);
     event ReducedDailyBorrows(uint currentDailyBorrows, uint amountReduced);
     event LoanCreated(uint indexed loanId, address nftContract, uint nft, uint interest, uint startTime, uint216 borrowed);
     event LiquidatorAdded(address liquidator);
@@ -217,6 +218,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
             }
         }
         _balances[from] -= length;
+        emit LoansRepaid(totalToRepay, length, from);
         payable(msg.sender).sendValue(msg.value - totalToRepay); // overflow checks implictly check that amount is enough
     }
 
