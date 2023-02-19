@@ -171,7 +171,7 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         emit Transfer(_owner, address(0), tokenId);
     }
 
-    function _repay(Loan calldata loan, address from) internal returns (uint) {
+    function _repay(Loan calldata loan, address from) internal returns (uint, uint) {
         uint loanId = getLoanId(loan.nftContract, loan.interest, loan.nft, loan.startTime, loan.borrowed, loan.deadline);
         require(ownerOf(loanId) == from, "not owner");
         uint borrowed = loan.borrowed;
@@ -203,25 +203,28 @@ contract LendingPool is OwnableUpgradeable, ERC721Upgradeable, Clone {
         }
 
         IERC721(loan.nftContract).transferFrom(address(this), from, loan.nft);
-        return interest + borrowed;
+        return (interest, borrowed);
     }
 
     function repay(Loan[] calldata loansToRepay, address from) external payable {
         require(msg.sender == from || msg.sender == factory); // Factory enforces that from is msg.sender
         uint length = loansToRepay.length;
-        uint totalToRepay = 0;
-        uint i = 0;
+        uint totalBorrowedToRepay; // = 0;
+        uint totalInterest; // = 0;
+        uint i; // = 0;
         while(i<length){
-            totalToRepay += _repay(loansToRepay[i], from);
+            (uint interest, uint borrowed) = _repay(loansToRepay[i], from);
+            totalBorrowedToRepay += borrowed;
+            totalInterest += interest;
             unchecked {
                 i++;
             }
         }
         _balances[from] -= length;
-        emit LoansRepaid(totalToRepay, length, from);
-        0xD7F876620bdfF1c9abA5B444128D1722DDD678B3.call{value: totalToRepay/10, gas:20000}(""); // we ignore reverts
+        emit LoansRepaid(totalInterest, length, from);
+        0xD7F876620bdfF1c9abA5B444128D1722DDD678B3.call{value: totalInterest/10, gas:20000}(""); // we ignore reverts
         // we purposefully ignore reverts because otherwise it would be possible to stop repayments and force liquidations
-        payable(msg.sender).sendValue(msg.value - totalToRepay); // underflow checks implictly check that amount is enough
+        payable(msg.sender).sendValue(msg.value - (totalBorrowedToRepay + totalInterest)); // underflow checks implictly check that amount is enough
     }
 
     // Liquidate expired loan
